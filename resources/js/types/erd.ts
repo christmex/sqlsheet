@@ -226,3 +226,19 @@ export type TablePreset = {
         columns: Array<Omit<TableColumn, 'id'>>;
     }>;
 };
+
+/**
+ * A relation the naming convention suggests, before anyone has agreed to it.
+ */
+export type SuggestedRelation = {
+    key: string;
+    referencedNodeId: string;
+    referencedColumnId: string;
+    referencedTableName: string;
+    referencedColumnName: string;
+    keyNodeId: string;
+    keyColumnId: string;
+    keyTableName: string;
+    keyColumnName: string;
+    isSelfReference: boolean;
+};

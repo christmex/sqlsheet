@@ -1,7 +1,8 @@
 import { Panel, useReactFlow } from '@xyflow/react';
-import { Layers, Map, Plus } from 'lucide-react';
-import { useCallback } from 'react';
+import { Layers, Map, Plus, Waypoints } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import FindRelationsModal from '@/components/erd/find-relations-modal';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -31,6 +32,7 @@ export default function DiagramToolbar({
     isMinimapVisible,
     onToggleMinimap,
 }: DiagramToolbarProps) {
+    const [isFindingRelations, setIsFindingRelations] = useState(false);
     const { addNodes, getNodes, screenToFlowPosition } = useReactFlow<
         DiagramNode,
         RelationEdge
@@ -179,6 +181,14 @@ export default function DiagramToolbar({
                 <Button
                     size="sm"
                     variant="ghost"
+                    onClick={() => setIsFindingRelations(true)}
+                    data-test="find-relations"
+                >
+                    <Waypoints /> Find relations
+                </Button>
+                <Button
+                    size="sm"
+                    variant="ghost"
                     aria-pressed={isMinimapVisible}
                     title={
                         isMinimapVisible
@@ -194,6 +204,11 @@ export default function DiagramToolbar({
                     <Map />
                 </Button>
             </div>
+
+            <FindRelationsModal
+                open={isFindingRelations}
+                onOpenChange={setIsFindingRelations}
+            />
         </Panel>
     );
 }

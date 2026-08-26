@@ -14,7 +14,9 @@ import type {
     StoredRelationEdge,
     StoredStickyNoteNode,
     StoredTableNode,
+    SuggestedRelation,
     TableColumn,
+    TableNode,
     TablePreset,
 } from '@/types/erd';
 
@@ -687,3 +689,105 @@ export const newNodeRowHeightInPixels = 260;
  * builds a document the server would refuse.
  */
 export const maximumNodesPerDiagram = 500;
+
+/**
+ * Read the naming convention and say which relations it implies.
+ *
+ * A column named `user_id` is split into `user` and `id`, and matched against a
+ * table whose singular is `user` and whose primary key is called `id`. Splitting
+ * the column rather than pluralising the table keeps this out of the business of
+ * guessing English: `people` never has to become `persons`.
+ *
+ * Columns that already take part in a relation are left alone.
+ */
+export function findSuggestedRelations(
+    nodes: DiagramNode[],
+    edges: RelationEdge[],
+): SuggestedRelation[] {
+    const tables = nodes.filter((node) => node.type === 'table');
+
+    const columnsWithRelations = new Set(
+        edges.flatMap((edge) => [
+            columnIdFromHandleId(edge.sourceHandle ?? ''),
+            columnIdFromHandleId(edge.targetHandle ?? ''),
+        ]),
+    );
+
+    const primaryKeysBySingularName = new Map<
+        string,
+        { node: TableNode; column: TableColumn }
+    >();
+
+    tables.forEach((node) => {
+        const primaryKey = node.data.columns.find((column) =>
+            column.keys.includes('primary'),
+        );
+
+        if (primaryKey) {
+            primaryKeysBySingularName.set(
+                singularizeTableName(node.data.name.trim().toLowerCase()),
+                { node, column: primaryKey },
+            );
+        }
+    });
+
+    const suggestions: SuggestedRelation[] = [];
+
+    tables.forEach((node) => {
+        node.data.columns.forEach((column) => {
+            if (columnsWithRelations.has(column.id)) {
+                return;
+            }
+
+            const separator = column.name.lastIndexOf('_');
+
+            if (separator < 1) {
+                return;
+            }
+
+            const referencedName = column.name
+                .slice(0, separator)
+                .trim()
+                .toLowerCase();
+            const referencedKeyName = column.name.slice(separator + 1);
+
+            const referenced = primaryKeysBySingularName.get(referencedName);
+
+            if (!referenced || referenced.column.name !== referencedKeyName) {
+                return;
+            }
+
+            suggestions.push({
+                key: `${node.id}:${column.id}`,
+                referencedNodeId: referenced.node.id,
+                referencedColumnId: referenced.column.id,
+                referencedTableName: referenced.node.data.name,
+                referencedColumnName: referenced.column.name,
+                keyNodeId: node.id,
+                keyColumnId: column.id,
+                keyTableName: node.data.name,
+                keyColumnName: column.name,
+                isSelfReference: referenced.node.id === node.id,
+            });
+        });
+    });
+
+    return suggestions;
+}
+
+/**
+ * Build the edge that a suggestion becomes once it is accepted.
+ */
+export function edgeFromSuggestion(
+    suggestion: SuggestedRelation,
+): RelationEdge {
+    return {
+        id: `rel_${nanoid()}`,
+        type: 'relation',
+        source: suggestion.referencedNodeId,
+        sourceHandle: columnHandleId(suggestion.referencedColumnId, 'right'),
+        target: suggestion.keyNodeId,
+        targetHandle: columnHandleId(suggestion.keyColumnId, 'left'),
+        data: { cardinality: 'one-to-many', foreignKeyEnd: 'target' },
+    };
+}
