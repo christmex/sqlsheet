@@ -15,6 +15,7 @@ import type { DefaultEdgeOptions, OnConnect, Viewport } from '@xyflow/react';
 import { nanoid } from 'nanoid';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import DiagramLegend from '@/components/erd/diagram-legend';
 import DiagramToolbar from '@/components/erd/diagram-toolbar';
 import RelationEdgeComponent from '@/components/erd/relation-edge';
 import ShortcutsModal from '@/components/erd/shortcuts-modal';
@@ -47,10 +48,23 @@ const edgeTypes = {
     relation: RelationEdgeComponent,
 };
 
+/**
+ * One grey that reads on both a white canvas and a near-black one.
+ *
+ * React Flow's own default drops to #3e3e3e in dark mode, which all but vanishes
+ * against the background — on screen, and completely in a dark export.
+ */
+const relationStroke = '#94a3b8';
+
 const defaultEdgeOptions: DefaultEdgeOptions = {
     type: 'relation',
-    markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
-    style: { strokeWidth: 1.5 },
+    markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 18,
+        height: 18,
+        color: relationStroke,
+    },
+    style: { strokeWidth: 1.5, stroke: relationStroke },
 };
 
 type DiagramCanvasProps = {
@@ -71,6 +85,7 @@ function Canvas({
     const { resolvedAppearance } = useAppearance();
     const [isMinimapVisible, setIsMinimapVisible] = useState(true);
     const [isShowingShortcuts, setIsShowingShortcuts] = useState(false);
+    const [isLegendVisible, setIsLegendVisible] = useState(true);
     const [nodes, setNodes, onNodesChange] = useNodesState<DiagramNode>(
         initialDocument.nodes,
     );
@@ -231,6 +246,7 @@ function Canvas({
                 />
             )}
             <Controls />
+            {isLegendVisible && <DiagramLegend />}
             <ShortcutsModal
                 open={isShowingShortcuts}
                 onOpenChange={setIsShowingShortcuts}
@@ -239,6 +255,8 @@ function Canvas({
                 diagramName={diagramName}
                 tablePresets={tablePresets}
                 onShowShortcuts={() => setIsShowingShortcuts(true)}
+                isLegendVisible={isLegendVisible}
+                onToggleLegend={() => setIsLegendVisible((visible) => !visible)}
                 isMinimapVisible={isMinimapVisible}
                 onToggleMinimap={() =>
                     setIsMinimapVisible((visible) => !visible)

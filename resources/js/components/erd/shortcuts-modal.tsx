@@ -1,3 +1,4 @@
+import { LegendRows } from '@/components/erd/diagram-legend';
 import {
     Dialog,
     DialogContent,
@@ -56,13 +57,20 @@ export default function ShortcutsModal({ open, onOpenChange }: Props) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Shortcuts</DialogTitle>
+                    <DialogTitle>Reading and driving a diagram</DialogTitle>
                     <DialogDescription>
                         Press ? at any time to bring this back.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4">
+                    <div>
+                        <p className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                            What the drawing means
+                        </p>
+                        <LegendRows />
+                    </div>
+
                     {shortcutGroups.map((group) => (
                         <div key={group.title}>
                             <p className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">

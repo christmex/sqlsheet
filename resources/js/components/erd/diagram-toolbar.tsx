@@ -1,9 +1,10 @@
 import { Panel, useReactFlow } from '@xyflow/react';
-import { Keyboard, Layers, Map, Plus, Waypoints } from 'lucide-react';
+import { Info, Keyboard, Layers, Map, Plus, Waypoints } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import ExportImageMenu from '@/components/erd/export-image-menu';
 import FindRelationsModal from '@/components/erd/find-relations-modal';
+import ThemeMenu from '@/components/erd/theme-menu';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -26,6 +27,8 @@ type DiagramToolbarProps = {
     diagramName: string;
     tablePresets: TablePreset[];
     onShowShortcuts: () => void;
+    isLegendVisible: boolean;
+    onToggleLegend: () => void;
     isMinimapVisible: boolean;
     onToggleMinimap: () => void;
 };
@@ -34,6 +37,8 @@ export default function DiagramToolbar({
     diagramName,
     tablePresets,
     onShowShortcuts,
+    isLegendVisible,
+    onToggleLegend,
     isMinimapVisible,
     onToggleMinimap,
 }: DiagramToolbarProps) {
@@ -208,6 +213,24 @@ export default function DiagramToolbar({
                     <Waypoints /> Find relations
                 </Button>
                 <ExportImageMenu diagramName={diagramName} />
+                <ThemeMenu />
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-pressed={isLegendVisible}
+                    title={
+                        isLegendVisible
+                            ? 'Hide what the drawing means'
+                            : 'Show what the drawing means'
+                    }
+                    className={
+                        isLegendVisible ? undefined : 'text-muted-foreground'
+                    }
+                    onClick={onToggleLegend}
+                    data-test="toggle-legend"
+                >
+                    <Info />
+                </Button>
                 <Button
                     size="sm"
                     variant="ghost"

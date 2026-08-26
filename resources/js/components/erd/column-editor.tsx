@@ -1,28 +1,13 @@
 import { useEffect, useRef } from 'react';
+import ColumnKindPicker from '@/components/erd/column-kind-picker';
 import { Input } from '@/components/ui/input';
 import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
     columnKeyLabels,
-    columnKindGroups,
-    columnKindSignatures,
     defaultColumnTypeFor,
     formatColumnType,
 } from '@/lib/erd';
 import { cn } from '@/lib/utils';
-import type {
-    ColumnKeyKind,
-    ColumnKind,
-    ColumnType,
-    TableColumn,
-} from '@/types';
+import type { ColumnKeyKind, ColumnType, TableColumn } from '@/types';
 
 type ColumnEditorProps = {
     column: TableColumn;
@@ -127,45 +112,12 @@ export default function ColumnEditor({
                         }
                     }}
                 >
-                    <Select
-                        defaultOpen
+                    <ColumnKindPicker
                         value={type.kind}
-                        onValueChange={(kind) =>
-                            changeType(defaultColumnTypeFor(kind as ColumnKind))
+                        onChange={(kind) =>
+                            changeType(defaultColumnTypeFor(kind))
                         }
-                    >
-                        <SelectTrigger
-                            className="h-6! w-36 px-1.5 font-mono text-[11px]"
-                            aria-label="Column type"
-                        >
-                            <SelectValue>{type.kind}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent className="max-h-96 w-80">
-                            {columnKindGroups.map((group) => (
-                                <SelectGroup key={group.label}>
-                                    <SelectLabel className="text-[11px] tracking-wide text-muted-foreground uppercase">
-                                        {group.label}
-                                    </SelectLabel>
-                                    {group.kinds.map((kind) => (
-                                        <SelectItem
-                                            key={kind}
-                                            value={kind}
-                                            className="items-start py-1.5"
-                                        >
-                                            <span className="flex flex-col gap-0.5">
-                                                <span className="font-mono text-xs">
-                                                    {kind}
-                                                </span>
-                                                <span className="font-mono text-[10px] text-muted-foreground">
-                                                    {columnKindSignatures[kind]}
-                                                </span>
-                                            </span>
-                                        </SelectItem>
-                                    ))}
-                                </SelectGroup>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    />
 
                     {(type.kind === 'char' || type.kind === 'string') && (
                         <Input

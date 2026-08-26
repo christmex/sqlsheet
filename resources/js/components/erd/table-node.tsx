@@ -31,8 +31,15 @@ const keyStyles: Record<ColumnKeyKind, string> = {
     unique: 'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300',
 };
 
+/**
+ * Always shown, dimmed until the table is hovered.
+ *
+ * Hidden entirely, a table reads as finished: nothing says a relation can start
+ * here. At full strength on every row of every table, a large diagram turns into
+ * a field of dots.
+ */
 const handleStyles =
-    'size-2.5! rounded-full! border-2! border-white! bg-neutral-400! opacity-0 transition-opacity duration-150 group-hover/table:opacity-100 dark:border-neutral-900!';
+    'size-2.5! rounded-full! border-2! border-white! bg-neutral-300! opacity-70 transition-opacity duration-150 group-hover/table:bg-neutral-400! group-hover/table:opacity-100 dark:border-neutral-900! dark:bg-neutral-600!';
 
 function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
     const { updateNodeData, setEdges } = useReactFlow<
@@ -134,7 +141,7 @@ function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
                             onClick={() => setEditingColumnId(column.id)}
                         >
                             {column.keys.length === 0 ? (
-                                <span className="text-[9px] leading-4 text-transparent transition-colors group-hover/row:text-neutral-300 dark:group-hover/row:text-neutral-600">
+                                <span className="text-[9px] leading-4 text-neutral-200 transition-colors group-hover/row:text-neutral-400 dark:text-neutral-700 dark:group-hover/row:text-neutral-500">
                                     key
                                 </span>
                             ) : (
@@ -193,7 +200,7 @@ function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
             <button
                 type="button"
                 data-test="add-column"
-                className="nodrag flex w-full items-center gap-1 rounded-b-[7px] border-t border-neutral-100 px-3 py-1.5 text-[11px] text-neutral-400 opacity-0 transition group-hover/table:opacity-100 hover:bg-neutral-50 hover:text-neutral-700 dark:border-neutral-800 dark:hover:bg-neutral-800"
+                className="nodrag flex w-full items-center gap-1 rounded-b-[7px] border-t border-neutral-100 px-3 py-1.5 text-[11px] text-neutral-400 transition hover:bg-neutral-50 hover:text-neutral-700 dark:border-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                 onClick={addColumn}
             >
                 <Plus className="size-3" /> Add column
