@@ -103,3 +103,23 @@ test('the preset produces migrations that actually build the schema', function (
         ->and(Schema::hasColumns('preset_sessions', ['id', 'user_id', 'ip_address', 'user_agent', 'payload', 'last_activity']))->toBeTrue()
         ->and(Schema::hasColumns('preset_job_batches', ['id', 'name', 'total_jobs', 'pending_jobs', 'failed_jobs', 'failed_job_ids', 'options', 'cancelled_at', 'created_at', 'finished_at']))->toBeTrue();
 });
+
+test('the Laravel preset draws its relation without claiming a constraint', function () {
+    $relations = laravelPreset()['relations'];
+
+    expect($relations)->toHaveCount(1)
+        ->and($relations[0]['from'])->toBe(['table' => 'sessions', 'column' => 'user_id'])
+        ->and($relations[0]['to'])->toBe(['table' => 'users', 'column' => 'id'])
+        ->and($relations[0]['isConstrained'])->toBeFalse();
+});
+
+test('the migrations the preset generates carry no foreign key constraint', function () {
+    $migrations = (new GenerateDiagramMigrations)->handle(
+        documentFromPresetTables(laravelPreset()['tables']),
+        CarbonImmutable::parse('2026-03-01 09:00:00'),
+    );
+
+    expect(implode("\n", $migrations))
+        ->not->toContain('constrained')
+        ->not->toContain('->foreign(');
+});

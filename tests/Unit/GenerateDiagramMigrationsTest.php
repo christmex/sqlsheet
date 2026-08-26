@@ -306,3 +306,56 @@ test('tables queued behind a cycle keep an order the database can accept', funct
     expect(array_search('middle', $order, true))->toBeLessThan(array_search('leaf', $order, true))
         ->and(array_search('a', $order, true))->toBeLessThan(array_search('middle', $order, true));
 });
+
+test('a relation that only references does not become a constraint', function () {
+    $nodes = [
+        tableNodeFor('tbl_users', 'users', [columnFor('col_u_id', 'id', ['kind' => 'id'], ['primary'])]),
+        tableNodeFor('tbl_sessions', 'sessions', [
+            columnFor('col_s_id', 'id', ['kind' => 'string', 'length' => 255], ['primary']),
+            columnFor('col_s_user', 'user_id', ['kind' => 'foreignId'], [], true),
+        ]),
+    ];
+
+    $edge = [
+        'id' => 'rel_1',
+        'source' => 'tbl_users',
+        'target' => 'tbl_sessions',
+        'sourceHandle' => 'col_u_id:right',
+        'targetHandle' => 'col_s_user:left',
+        'data' => ['cardinality' => 'one-to-many', 'foreignKeyEnd' => 'target', 'isConstrained' => false],
+    ];
+
+    $files = generateMigrations($nodes, [$edge]);
+    $sessions = collect($files)->first(fn (string $contents) => str_contains($contents, "Schema::create('sessions'"));
+
+    expect($sessions)
+        ->toContain("\$table->foreignId('user_id')->nullable();")
+        ->not->toContain('constrained')
+        ->not->toContain('->foreign(');
+});
+
+test('an unenforced relation does not force the table order', function () {
+    $nodes = [
+        tableNodeFor('tbl_sessions', 'sessions', [
+            columnFor('col_s_id', 'id', ['kind' => 'string', 'length' => 255], ['primary']),
+            columnFor('col_s_user', 'user_id', ['kind' => 'foreignId'], [], true),
+        ]),
+        tableNodeFor('tbl_users', 'users', [columnFor('col_u_id', 'id', ['kind' => 'id'], ['primary'])]),
+    ];
+
+    $edge = [
+        'id' => 'rel_1',
+        'source' => 'tbl_users',
+        'target' => 'tbl_sessions',
+        'sourceHandle' => 'col_u_id:right',
+        'targetHandle' => 'col_s_user:left',
+        'data' => ['cardinality' => 'one-to-many', 'foreignKeyEnd' => 'target', 'isConstrained' => false],
+    ];
+
+    $order = array_map(
+        fn (string $filename) => Str::of($filename)->after('_create_')->before('_table.php')->toString(),
+        array_keys(generateMigrations($nodes, [$edge])),
+    );
+
+    expect($order)->toBe(['sessions', 'users']);
+});

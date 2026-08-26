@@ -146,6 +146,15 @@ export type RelationEdgeData = {
     cardinality: RelationCardinality;
     /** Which end of the relation carries the foreign key. */
     foreignKeyEnd: RelationEnd;
+    /**
+     * Is this relation a constraint the database enforces, or only a note that
+     * one column points at another?
+     *
+     * Plenty of real schemas reference a table without ever constraining it —
+     * Laravel's own `sessions.user_id` is one — and a diagram that cannot say so
+     * forces a choice between drawing the relation and exporting the truth.
+     */
+    isConstrained: boolean;
 };
 
 export type RelationEnd = 'source' | 'target';
@@ -224,6 +233,11 @@ export type TablePreset = {
     tables: Array<{
         name: string;
         columns: Array<Omit<TableColumn, 'id'>>;
+    }>;
+    relations: Array<{
+        from: { table: string; column: string };
+        to: { table: string; column: string };
+        isConstrained: boolean;
     }>;
 };
 

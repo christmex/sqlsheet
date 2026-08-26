@@ -175,6 +175,7 @@ function Canvas({
                         data: {
                             cardinality: 'one-to-many',
                             foreignKeyEnd: applied.foreignKeyEnd,
+                            isConstrained: true,
                         },
                     },
                     currentEdges,

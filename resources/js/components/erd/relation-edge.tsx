@@ -116,12 +116,21 @@ export default function RelationEdge({
 
     const cardinality = data?.cardinality ?? 'one-to-many';
     const foreignKeyEnd = data?.foreignKeyEnd ?? 'target';
+    const isConstrained = data?.isConstrained ?? true;
 
     const toggleCardinality = () =>
         updateEdgeData(id, {
             cardinality:
                 cardinality === 'one-to-many' ? 'one-to-one' : 'one-to-many',
             foreignKeyEnd,
+            isConstrained,
+        });
+
+    const toggleConstraint = () =>
+        updateEdgeData(id, {
+            cardinality,
+            foreignKeyEnd,
+            isConstrained: !isConstrained,
         });
 
     const markers = [
@@ -139,7 +148,14 @@ export default function RelationEdge({
 
     return (
         <>
-            <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} />
+            <BaseEdge
+                id={id}
+                path={path}
+                markerEnd={markerEnd}
+                style={
+                    isConstrained ? style : { ...style, strokeDasharray: '6 4' }
+                }
+            />
             <EdgeLabelRenderer>
                 {markers.map((marker) => {
                     const holdsTheKey = marker.end === foreignKeyEnd;
@@ -155,7 +171,9 @@ export default function RelationEdge({
                             title={
                                 holdsTheKey
                                     ? 'Click to switch between one-to-many and one-to-one'
-                                    : 'The row being pointed at'
+                                    : isConstrained
+                                      ? 'The database enforces this. Click to make it a reference only.'
+                                      : 'A reference only, not enforced by the database. Click to enforce it.'
                             }
                             className="nodrag nopan pointer-events-auto absolute rounded bg-neutral-50 px-1 font-mono text-[10px] text-neutral-500 dark:bg-neutral-950 dark:text-neutral-400"
                             style={{
@@ -165,7 +183,9 @@ export default function RelationEdge({
                                     : undefined,
                             }}
                             onClick={
-                                holdsTheKey ? toggleCardinality : undefined
+                                holdsTheKey
+                                    ? toggleCardinality
+                                    : toggleConstraint
                             }
                         >
                             {holdsTheKey

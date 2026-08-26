@@ -35,7 +35,7 @@ export default function DiagramToolbar({
     onToggleMinimap,
 }: DiagramToolbarProps) {
     const [isFindingRelations, setIsFindingRelations] = useState(false);
-    const { addNodes, getNodes, screenToFlowPosition } = useReactFlow<
+    const { addNodes, addEdges, getNodes, screenToFlowPosition } = useReactFlow<
         DiagramNode,
         RelationEdge
     >();
@@ -88,12 +88,15 @@ export default function DiagramToolbar({
 
     const addPreset = useCallback(
         (preset: TablePreset) => {
-            const takenTableNames = takenTableNamesOnCanvas();
+            const currentNodes = getNodes();
+            const tableCount = currentNodes.filter(
+                (node) => node.type === 'table',
+            ).length;
 
-            const { nodes, skippedTableNames } = nodesFromPreset(
+            const { nodes, edges, skippedTableNames } = nodesFromPreset(
                 preset,
-                takenTableNames,
-                nextNodePosition(takenTableNames.length),
+                currentNodes,
+                nextNodePosition(tableCount),
             );
 
             /**
@@ -106,6 +109,20 @@ export default function DiagramToolbar({
 
             if (roomForNodes.length > 0) {
                 addNodes(roomForNodes);
+            }
+
+            // Only the relations whose tables actually made it onto the canvas.
+            const addedNodeIds = new Set(roomForNodes.map((node) => node.id));
+            const drawableEdges = edges.filter(
+                (edge) =>
+                    (!nodes.some((node) => node.id === edge.source) ||
+                        addedNodeIds.has(edge.source)) &&
+                    (!nodes.some((node) => node.id === edge.target) ||
+                        addedNodeIds.has(edge.target)),
+            );
+
+            if (drawableEdges.length > 0) {
+                addEdges(drawableEdges);
             }
 
             if (roomForNodes.length < nodes.length) {
@@ -124,7 +141,7 @@ export default function DiagramToolbar({
                 toast.info(preset.caveat);
             }
         },
-        [addNodes, getNodes, nextNodePosition, takenTableNamesOnCanvas],
+        [addEdges, addNodes, getNodes, nextNodePosition],
     );
 
     const addStickyNote = useCallback(() => {

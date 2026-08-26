@@ -91,7 +91,7 @@ class GenerateDiagramMigrations
      *
      * @param  array<string, mixed>  $document
      * @param  array<string, array<string, mixed>>  $tables
-     * @return array<string, array{table: string, column: string, tableNodeId: string}>
+     * @return array<string, array{table: string, column: string, tableNodeId: string, isConstrained: bool}>
      */
     protected function relationsByColumnId(array $document, array $tables): array
     {
@@ -122,6 +122,7 @@ class GenerateDiagramMigrations
                 'table' => $tables[$referencedOwner['nodeId']]['data']['name'],
                 'column' => $referencedOwner['column']['name'],
                 'tableNodeId' => $referencedOwner['nodeId'],
+                'isConstrained' => (bool) ($edge['data']['isConstrained'] ?? true),
             ];
         }
 
@@ -136,7 +137,7 @@ class GenerateDiagramMigrations
      * them would hide the problem instead of showing it.
      *
      * @param  array<string, array<string, mixed>>  $tables
-     * @param  array<string, array{table: string, column: string, tableNodeId: string}>  $relations
+     * @param  array<string, array{table: string, column: string, tableNodeId: string, isConstrained: bool}>  $relations
      * @return array<int, array<string, mixed>>
      */
     protected function referencedTablesFirst(array $tables, array $relations): array
@@ -147,7 +148,10 @@ class GenerateDiagramMigrations
             $dependencies[$nodeId] = [];
 
             foreach ($table['data']['columns'] ?? [] as $column) {
-                $referenced = $relations[$column['id']]['tableNodeId'] ?? null;
+                $relation = $relations[$column['id']] ?? null;
+                $referenced = $relation !== null && $relation['isConstrained']
+                    ? $relation['tableNodeId']
+                    : null;
 
                 if ($referenced !== null && $referenced !== $nodeId) {
                     $dependencies[$nodeId][$referenced] = true;
@@ -235,7 +239,7 @@ class GenerateDiagramMigrations
      * Build the whole migration file for one table.
      *
      * @param  array<int, array<string, mixed>>  $columns
-     * @param  array<string, array{table: string, column: string, tableNodeId: string}>  $relations
+     * @param  array<string, array{table: string, column: string, tableNodeId: string, isConstrained: bool}>  $relations
      */
     protected function migrationFor(string $tableName, array $columns, array $relations): string
     {
@@ -248,7 +252,10 @@ class GenerateDiagramMigrations
         foreach ($columns as $column) {
             $relation = $relations[$column['id']] ?? null;
 
-            if ($relation === null || in_array($column['type']['kind'], self::SELF_CONSTRAINING_KINDS, true)) {
+            if ($relation === null
+                || ! $relation['isConstrained']
+                || in_array($column['type']['kind'], self::SELF_CONSTRAINING_KINDS, true)
+            ) {
                 continue;
             }
 
@@ -297,7 +304,7 @@ class GenerateDiagramMigrations
      * Build the single line that creates one column.
      *
      * @param  array<string, mixed>  $column
-     * @param  array{table: string, column: string, tableNodeId: string}|null  $relation
+     * @param  array{table: string, column: string, tableNodeId: string, isConstrained: bool}|null  $relation
      */
     protected function columnLine(array $column, ?array $relation): string
     {
@@ -329,7 +336,7 @@ class GenerateDiagramMigrations
             $line .= sprintf('->default(%s)', $this->quoted($column['defaultValue']));
         }
 
-        if ($relation !== null && in_array($kind, self::SELF_CONSTRAINING_KINDS, true)) {
+        if ($relation !== null && $relation['isConstrained'] && in_array($kind, self::SELF_CONSTRAINING_KINDS, true)) {
             $line .= sprintf('->constrained(%s)', $this->quoted($relation['table']));
         }
 

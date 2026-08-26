@@ -115,6 +115,7 @@ class UpdateDiagramDocumentRequest extends FormRequest
             'document.edges.*.data' => ['required', 'array'],
             'document.edges.*.data.cardinality' => ['required', Rule::enum(RelationCardinality::class)],
             'document.edges.*.data.foreignKeyEnd' => ['sometimes', Rule::in(['source', 'target'])],
+            'document.edges.*.data.isConstrained' => ['sometimes', 'boolean'],
 
             'document.viewport' => ['required', 'array'],
             'document.viewport.x' => ['required', 'numeric'],

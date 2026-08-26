@@ -33,6 +33,19 @@ return [
         'name' => 'Laravel 13',
         'description' => 'The eight tables a new Laravel 13 project already has.',
         'caveat' => 'Three things a diagram cannot draw yet are left out: indexes, including the one spanning three columns on failed_jobs; the timestamps pair is written out as two columns; and the current-time default on failed_at is not carried over.',
+        /**
+         * Laravel's own migrations declare no foreign key constraints at all —
+         * `sessions.user_id` is a `foreignId` column with an index and nothing
+         * more. The relation is drawn so the diagram reads, and marked as a
+         * reference so the exported migration stays what Laravel actually writes.
+         */
+        'relations' => [
+            [
+                'from' => ['table' => 'sessions', 'column' => 'user_id'],
+                'to' => ['table' => 'users', 'column' => 'id'],
+                'isConstrained' => false,
+            ],
+        ],
         'tables' => [
             [
                 'name' => 'users',

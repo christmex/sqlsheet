@@ -309,6 +309,7 @@ export function toStoredEdge(edge: RelationEdge): StoredRelationEdge {
         data: {
             cardinality: edge.data?.cardinality ?? 'one-to-many',
             foreignKeyEnd: edge.data?.foreignKeyEnd ?? 'target',
+            isConstrained: edge.data?.isConstrained ?? true,
         },
     };
 }
@@ -628,12 +629,21 @@ export function applyRelationToColumns(
  */
 export function nodesFromPreset(
     preset: TablePreset,
-    takenTableNames: string[],
+    existingNodes: DiagramNode[],
     startPosition: XYPosition,
-): { nodes: StoredTableNode[]; skippedTableNames: string[] } {
+): {
+    nodes: StoredTableNode[];
+    edges: RelationEdge[];
+    skippedTableNames: string[];
+} {
+    const existingTables = existingNodes.filter(
+        (node) => node.type === 'table',
+    );
+    const takenTableNames = existingTables.map((node) => node.data.name);
     const taken = new Set(
         takenTableNames.map((name) => name.trim().toLowerCase()),
     );
+
     const nodes: StoredTableNode[] = [];
     const skippedTableNames: string[] = [];
 
@@ -673,7 +683,56 @@ export function nodesFromPreset(
         });
     });
 
-    return { nodes, skippedTableNames };
+    /**
+     * Relations are resolved against the tables already on the canvas as well as
+     * the ones just added, so a preset dropped next to an existing `users` still
+     * points at it rather than at nothing.
+     */
+    const findColumn = (tableName: string, columnName: string) => {
+        const table = [...nodes, ...existingTables].find(
+            (candidate) =>
+                candidate.type === 'table' &&
+                candidate.data.name.trim().toLowerCase() ===
+                    tableName.trim().toLowerCase(),
+        );
+
+        if (table?.type !== 'table') {
+            return null;
+        }
+
+        const column = table.data.columns.find(
+            (candidate) => candidate.name === columnName,
+        );
+
+        return column ? { nodeId: table.id, columnId: column.id } : null;
+    };
+
+    const edges: RelationEdge[] = [];
+
+    preset.relations.forEach((relation) => {
+        const keyEnd = findColumn(relation.from.table, relation.from.column);
+        const referencedEnd = findColumn(relation.to.table, relation.to.column);
+
+        if (!keyEnd || !referencedEnd) {
+            return;
+        }
+
+        edges.push({
+            id: `rel_${nanoid()}`,
+            type: 'relation',
+            source: referencedEnd.nodeId,
+            sourceHandle: columnHandleId(referencedEnd.columnId, 'right'),
+            target: keyEnd.nodeId,
+            targetHandle: columnHandleId(keyEnd.columnId, 'left'),
+            data: {
+                cardinality: 'one-to-many',
+                foreignKeyEnd: 'target',
+                isConstrained: relation.isConstrained,
+            },
+        });
+    });
+
+    return { nodes, edges, skippedTableNames };
 }
 
 /**
@@ -801,7 +860,11 @@ export function edgeFromSuggestion(
         sourceHandle: columnHandleId(suggestion.referencedColumnId, 'right'),
         target: suggestion.keyNodeId,
         targetHandle: columnHandleId(suggestion.keyColumnId, 'left'),
-        data: { cardinality: 'one-to-many', foreignKeyEnd: 'target' },
+        data: {
+            cardinality: 'one-to-many',
+            foreignKeyEnd: 'target',
+            isConstrained: true,
+        },
     };
 }
 
