@@ -15,6 +15,7 @@ import {
     applyRelationToColumns,
     edgeFromSuggestion,
     findSuggestedRelations,
+    maximumEdgesPerDiagram,
 } from '@/lib/erd';
 import type { DiagramNode, RelationEdge } from '@/types';
 
@@ -64,7 +65,36 @@ export default function FindRelationsModal({ open, onOpenChange }: Props) {
     const draw = () => {
         let nodes = getNodes();
 
-        accepted.forEach((suggestion) => {
+        /**
+         * The canvas can have moved on since this list was drawn up — a table
+         * deleted, an undo pressed. An edge pointing at something that is gone is
+         * refused by the server on every later save, and cannot be deleted from
+         * the canvas because it has nothing left to render against.
+         */
+        const stillThere = accepted.filter((suggestion) =>
+            [
+                {
+                    nodeId: suggestion.referencedNodeId,
+                    columnId: suggestion.referencedColumnId,
+                },
+                {
+                    nodeId: suggestion.keyNodeId,
+                    columnId: suggestion.keyColumnId,
+                },
+            ].every(({ nodeId, columnId }) => {
+                const node = nodes.find((candidate) => candidate.id === nodeId);
+
+                return (
+                    node?.type === 'table' &&
+                    node.data.columns.some((column) => column.id === columnId)
+                );
+            }),
+        );
+
+        const room = maximumEdgesPerDiagram - getEdges().length;
+        const drawable = stillThere.slice(0, Math.max(room, 0));
+
+        drawable.forEach((suggestion) => {
             nodes = applyRelationToColumns(
                 nodes,
                 {
@@ -81,12 +111,20 @@ export default function FindRelationsModal({ open, onOpenChange }: Props) {
         setNodes(nodes);
         setEdges((currentEdges) => [
             ...currentEdges,
-            ...accepted.map(edgeFromSuggestion),
+            ...drawable.map(edgeFromSuggestion),
         ]);
 
-        toast.success(
-            `Drew ${accepted.length} ${accepted.length === 1 ? 'relation' : 'relations'}.`,
-        );
+        if (drawable.length < accepted.length) {
+            toast.warning(
+                `${accepted.length - drawable.length} could not be drawn: what they point at has changed, or this diagram is full at ${maximumEdgesPerDiagram} relations.`,
+            );
+        }
+
+        if (drawable.length > 0) {
+            toast.success(
+                `Drew ${drawable.length} ${drawable.length === 1 ? 'relation' : 'relations'}.`,
+            );
+        }
 
         setRejectedKeys([]);
         onOpenChange(false);

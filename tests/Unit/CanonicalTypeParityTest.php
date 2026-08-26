@@ -73,11 +73,18 @@ test('the column key kinds PHP knows about are exactly the ones TypeScript offer
     expect($typeScriptKeys)->toBe($phpKeys);
 });
 
-test('the canvas stops at the same number of nodes the server accepts', function () {
+test('the canvas stops at the same ceilings the server accepts', function () {
     $typeScript = file_get_contents(dirname(__DIR__, 2).'/resources/js/lib/erd.ts');
 
-    preg_match('/export const maximumNodesPerDiagram = (\d+);/', $typeScript, $matches);
+    $ceilings = [
+        'maximumNodesPerDiagram' => UpdateDiagramDocumentRequest::MAXIMUM_NODES,
+        'maximumEdgesPerDiagram' => UpdateDiagramDocumentRequest::MAXIMUM_EDGES,
+    ];
 
-    expect($matches[1] ?? null)->not->toBeNull()
-        ->and((int) $matches[1])->toBe(UpdateDiagramDocumentRequest::MAXIMUM_NODES);
+    foreach ($ceilings as $constant => $enforced) {
+        preg_match('/export const '.$constant.' = (\d+);/', $typeScript, $matches);
+
+        expect($matches[1] ?? null)->not->toBeNull("The canvas has no {$constant}.")
+            ->and((int) $matches[1])->toBe($enforced);
+    }
 });

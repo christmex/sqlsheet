@@ -371,15 +371,16 @@ export function nextAvailableName(
     baseName: string,
     takenNames: string[],
 ): string {
-    const taken = new Set(takenNames.map((name) => name.toLowerCase()));
+    const taken = new Set(takenNames.map((name) => name.trim().toLowerCase()));
+    const comparableName = baseName.trim().toLowerCase();
 
-    if (!taken.has(baseName)) {
+    if (!taken.has(comparableName)) {
         return baseName;
     }
 
     let suffix = 2;
 
-    while (taken.has(`${baseName}_${suffix}`)) {
+    while (taken.has(`${comparableName}_${suffix}`)) {
         suffix += 1;
     }
 
@@ -605,6 +606,10 @@ export function applyRelationToColumns(
                                   ? column.keys
                                   : [...column.keys, foreignKey],
                               type: foreignKeyTypeFor(referencedColumn.type),
+                              // A default written for the previous type would
+                              // survive into the migration as, say, a word
+                              // defaulted onto an integer column.
+                              defaultValue: null,
                           }
                         : column,
                 ),
@@ -689,6 +694,14 @@ export const newNodeRowHeightInPixels = 260;
  * builds a document the server would refuse.
  */
 export const maximumNodesPerDiagram = 500;
+
+/**
+ * The most relations one diagram may hold.
+ *
+ * Mirrors `UpdateDiagramDocumentRequest::MAXIMUM_EDGES`, held to it by
+ * tests/Unit/CanonicalTypeParityTest.php.
+ */
+export const maximumEdgesPerDiagram = 2000;
 
 /**
  * Read the naming convention and say which relations it implies.
@@ -790,4 +803,22 @@ export function edgeFromSuggestion(
         targetHandle: columnHandleId(suggestion.keyColumnId, 'left'),
         data: { cardinality: 'one-to-many', foreignKeyEnd: 'target' },
     };
+}
+
+/**
+ * Serialise just the drawing, for comparing one state of it against another.
+ *
+ * The viewport is left out on purpose: moving the camera is not a change to the
+ * diagram, and treating it as one would make it something to undo.
+ */
+export function canonicalDrawingJson(
+    nodes: StoredDiagramNode[],
+    edges: StoredRelationEdge[],
+): string {
+    return canonicalDocumentJson({
+        version: 1,
+        nodes,
+        edges,
+        viewport: { x: 0, y: 0, zoom: 1 },
+    });
 }

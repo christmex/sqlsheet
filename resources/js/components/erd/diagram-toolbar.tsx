@@ -1,5 +1,5 @@
 import { Panel, useReactFlow } from '@xyflow/react';
-import { Layers, Map, Plus, Waypoints } from 'lucide-react';
+import { Keyboard, Layers, Map, Plus, Waypoints } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import FindRelationsModal from '@/components/erd/find-relations-modal';
@@ -23,12 +23,14 @@ import type { DiagramNode, RelationEdge, TablePreset } from '@/types';
 
 type DiagramToolbarProps = {
     tablePresets: TablePreset[];
+    onShowShortcuts: () => void;
     isMinimapVisible: boolean;
     onToggleMinimap: () => void;
 };
 
 export default function DiagramToolbar({
     tablePresets,
+    onShowShortcuts,
     isMinimapVisible,
     onToggleMinimap,
 }: DiagramToolbarProps) {
@@ -185,6 +187,15 @@ export default function DiagramToolbar({
                     data-test="find-relations"
                 >
                     <Waypoints /> Find relations
+                </Button>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Shortcuts"
+                    onClick={onShowShortcuts}
+                    data-test="show-shortcuts"
+                >
+                    <Keyboard />
                 </Button>
                 <Button
                     size="sm"

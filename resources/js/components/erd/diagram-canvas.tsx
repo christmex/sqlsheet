@@ -7,6 +7,7 @@ import {
     MarkerType,
     MiniMap,
     ReactFlow,
+    ReactFlowProvider,
     useEdgesState,
     useNodesState,
 } from '@xyflow/react';
@@ -16,9 +17,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import DiagramToolbar from '@/components/erd/diagram-toolbar';
 import RelationEdgeComponent from '@/components/erd/relation-edge';
+import ShortcutsModal from '@/components/erd/shortcuts-modal';
 import StickyNoteNode from '@/components/erd/sticky-note-node';
 import TableNode from '@/components/erd/table-node';
 import { useAppearance } from '@/hooks/use-appearance';
+import { useDiagramHistory } from '@/hooks/use-diagram-history';
+import { useDiagramShortcuts } from '@/hooks/use-diagram-shortcuts';
 import {
     applyRelationToColumns,
     columnIdFromHandleId,
@@ -56,7 +60,7 @@ type DiagramCanvasProps = {
     children?: ReactNode;
 };
 
-export default function DiagramCanvas({
+function Canvas({
     initialDocument,
     tablePresets,
     onDocumentChange,
@@ -64,12 +68,36 @@ export default function DiagramCanvas({
 }: DiagramCanvasProps) {
     const { resolvedAppearance } = useAppearance();
     const [isMinimapVisible, setIsMinimapVisible] = useState(true);
+    const [isShowingShortcuts, setIsShowingShortcuts] = useState(false);
     const [nodes, setNodes, onNodesChange] = useNodesState<DiagramNode>(
         initialDocument.nodes,
     );
     const [edges, setEdges, onEdgesChange] = useEdgesState<RelationEdge>(
         initialDocument.edges.map(toCanvasEdge),
     );
+
+    const { undo, redo } = useDiagramHistory({
+        nodes,
+        edges,
+        setNodes,
+        setEdges,
+    });
+
+    const selectEverything = useCallback(() => {
+        setNodes((currentNodes) =>
+            currentNodes.map((node) => ({ ...node, selected: true })),
+        );
+        setEdges((currentEdges) =>
+            currentEdges.map((edge) => ({ ...edge, selected: true })),
+        );
+    }, [setEdges, setNodes]);
+
+    useDiagramShortcuts({
+        onUndo: undo,
+        onRedo: redo,
+        onSelectEverything: selectEverything,
+        onShowShortcuts: () => setIsShowingShortcuts(true),
+    });
 
     const viewportRef = useRef<Viewport>(initialDocument.viewport);
     const nodesRef = useRef(nodes);
@@ -200,8 +228,13 @@ export default function DiagramCanvas({
                 />
             )}
             <Controls />
+            <ShortcutsModal
+                open={isShowingShortcuts}
+                onOpenChange={setIsShowingShortcuts}
+            />
             <DiagramToolbar
                 tablePresets={tablePresets}
+                onShowShortcuts={() => setIsShowingShortcuts(true)}
                 isMinimapVisible={isMinimapVisible}
                 onToggleMinimap={() =>
                     setIsMinimapVisible((visible) => !visible)
@@ -209,5 +242,18 @@ export default function DiagramCanvas({
             />
             {children}
         </ReactFlow>
+    );
+}
+
+/**
+ * React Flow's hooks only work underneath its provider, and this component is
+ * the one that renders `<ReactFlow>` — so the provider has to sit above it
+ * rather than around the flow itself.
+ */
+export default function DiagramCanvas(props: DiagramCanvasProps) {
+    return (
+        <ReactFlowProvider>
+            <Canvas {...props} />
+        </ReactFlowProvider>
     );
 }
