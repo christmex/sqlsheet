@@ -219,6 +219,7 @@ export default function DiagramShow({
 
             <div className="h-screen w-screen bg-neutral-50 dark:bg-neutral-950">
                 <DiagramCanvas
+                    diagramName={diagram.name}
                     initialDocument={diagram.document}
                     tablePresets={tablePresets}
                     onDocumentChange={scheduleSave}

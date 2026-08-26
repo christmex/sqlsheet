@@ -54,6 +54,7 @@ const defaultEdgeOptions: DefaultEdgeOptions = {
 };
 
 type DiagramCanvasProps = {
+    diagramName: string;
     initialDocument: DiagramDocument;
     tablePresets: TablePreset[];
     onDocumentChange?: (nextDocument: DiagramDocument) => void;
@@ -61,6 +62,7 @@ type DiagramCanvasProps = {
 };
 
 function Canvas({
+    diagramName,
     initialDocument,
     tablePresets,
     onDocumentChange,
@@ -234,6 +236,7 @@ function Canvas({
                 onOpenChange={setIsShowingShortcuts}
             />
             <DiagramToolbar
+                diagramName={diagramName}
                 tablePresets={tablePresets}
                 onShowShortcuts={() => setIsShowingShortcuts(true)}
                 isMinimapVisible={isMinimapVisible}

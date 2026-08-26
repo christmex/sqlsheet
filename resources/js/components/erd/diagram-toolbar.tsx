@@ -2,6 +2,7 @@ import { Panel, useReactFlow } from '@xyflow/react';
 import { Keyboard, Layers, Map, Plus, Waypoints } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import ExportImageMenu from '@/components/erd/export-image-menu';
 import FindRelationsModal from '@/components/erd/find-relations-modal';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +23,7 @@ import {
 import type { DiagramNode, RelationEdge, TablePreset } from '@/types';
 
 type DiagramToolbarProps = {
+    diagramName: string;
     tablePresets: TablePreset[];
     onShowShortcuts: () => void;
     isMinimapVisible: boolean;
@@ -29,6 +31,7 @@ type DiagramToolbarProps = {
 };
 
 export default function DiagramToolbar({
+    diagramName,
     tablePresets,
     onShowShortcuts,
     isMinimapVisible,
@@ -205,6 +208,7 @@ export default function DiagramToolbar({
                 >
                     <Waypoints /> Find relations
                 </Button>
+                <ExportImageMenu diagramName={diagramName} />
                 <Button
                     size="sm"
                     variant="ghost"
