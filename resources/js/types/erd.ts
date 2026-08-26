@@ -209,3 +209,20 @@ export type DiagramSummary = {
     name: string;
     updatedAt: string | null;
 };
+
+/**
+ * A ready-made set of tables, described by the server and turned into nodes here.
+ *
+ * Columns arrive without ids: those belong to the diagram the preset is added to,
+ * not to the preset itself.
+ */
+export type TablePreset = {
+    key: string;
+    name: string;
+    description: string;
+    caveat: string;
+    tables: Array<{
+        name: string;
+        columns: Array<Omit<TableColumn, 'id'>>;
+    }>;
+};

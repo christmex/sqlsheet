@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { canonicalDocumentJson } from '@/lib/erd';
 import { migrations, rename, update } from '@/routes/diagrams';
 import { index as diagramsIndex } from '@/routes/diagrams';
-import type { DiagramDocument } from '@/types';
+import type { DiagramDocument, TablePreset } from '@/types';
 
 const autosaveDelayInMilliseconds = 1000;
 const conflictStatus = 409;
@@ -17,6 +17,7 @@ const goneStatus = 404;
 
 type Props = {
     hasTables: boolean;
+    tablePresets: TablePreset[];
     diagram: {
         id: number;
         name: string;
@@ -78,7 +79,11 @@ function invalidDocumentProblem(reason: string): SaveProblem {
     };
 }
 
-export default function DiagramShow({ diagram, hasTables }: Props) {
+export default function DiagramShow({
+    diagram,
+    hasTables,
+    tablePresets,
+}: Props) {
     const [canExport, setCanExport] = useState(hasTables);
     const { currentTeam } = usePage().props;
     const teamSlug = currentTeam?.slug ?? '';
@@ -215,6 +220,7 @@ export default function DiagramShow({ diagram, hasTables }: Props) {
             <div className="h-screen w-screen bg-neutral-50 dark:bg-neutral-950">
                 <DiagramCanvas
                     initialDocument={diagram.document}
+                    tablePresets={tablePresets}
                     onDocumentChange={scheduleSave}
                 >
                     <Panel position="top-left">

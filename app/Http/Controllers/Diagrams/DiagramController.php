@@ -59,6 +59,7 @@ class DiagramController extends Controller
     {
         return Inertia::render('diagrams/show', [
             'hasTables' => $diagram->hasTables(),
+            'tablePresets' => config('table_presets'),
             'diagram' => [
                 'id' => $diagram->id,
                 'name' => $diagram->name,

@@ -26,7 +26,12 @@ import {
     toStoredEdge,
     toStoredNode,
 } from '@/lib/erd';
-import type { DiagramDocument, DiagramNode, RelationEdge } from '@/types';
+import type {
+    DiagramDocument,
+    DiagramNode,
+    RelationEdge,
+    TablePreset,
+} from '@/types';
 import '@xyflow/react/dist/style.css';
 
 const nodeTypes = {
@@ -46,12 +51,14 @@ const defaultEdgeOptions: DefaultEdgeOptions = {
 
 type DiagramCanvasProps = {
     initialDocument: DiagramDocument;
+    tablePresets: TablePreset[];
     onDocumentChange?: (nextDocument: DiagramDocument) => void;
     children?: ReactNode;
 };
 
 export default function DiagramCanvas({
     initialDocument,
+    tablePresets,
     onDocumentChange,
     children,
 }: DiagramCanvasProps) {
@@ -194,6 +201,7 @@ export default function DiagramCanvas({
             )}
             <Controls />
             <DiagramToolbar
+                tablePresets={tablePresets}
                 isMinimapVisible={isMinimapVisible}
                 onToggleMinimap={() =>
                     setIsMinimapVisible((visible) => !visible)

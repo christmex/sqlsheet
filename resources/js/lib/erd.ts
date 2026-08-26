@@ -15,6 +15,7 @@ import type {
     StoredStickyNoteNode,
     StoredTableNode,
     TableColumn,
+    TablePreset,
 } from '@/types/erd';
 
 /**
@@ -611,3 +612,78 @@ export function applyRelationToColumns(
 
     return { nodes: updatedNodes, foreignKeyEnd };
 }
+
+/**
+ * Turn a preset into nodes for a diagram that already has tables of its own.
+ *
+ * A table whose name is already on the canvas is left alone rather than added
+ * twice or written over: the drawing in front of the user is the one that counts.
+ */
+export function nodesFromPreset(
+    preset: TablePreset,
+    takenTableNames: string[],
+    startPosition: XYPosition,
+): { nodes: StoredTableNode[]; skippedTableNames: string[] } {
+    const taken = new Set(
+        takenTableNames.map((name) => name.trim().toLowerCase()),
+    );
+    const nodes: StoredTableNode[] = [];
+    const skippedTableNames: string[] = [];
+
+    preset.tables.forEach((table) => {
+        if (taken.has(table.name.trim().toLowerCase())) {
+            skippedTableNames.push(table.name);
+
+            return;
+        }
+
+        const placed = nodes.length;
+
+        nodes.push({
+            id: `tbl_${nanoid()}`,
+            type: 'table',
+            position: {
+                x:
+                    startPosition.x +
+                    (placed % newNodesPerRow) * newNodeColumnWidthInPixels,
+                y:
+                    startPosition.y +
+                    Math.floor(placed / newNodesPerRow) *
+                        newNodeRowHeightInPixels,
+            },
+            data: {
+                name: table.name,
+                headerColor:
+                    tableHeaderColors[
+                        (takenTableNames.length + placed) %
+                            tableHeaderColors.length
+                    ],
+                columns: table.columns.map((column) => ({
+                    ...column,
+                    id: `col_${nanoid()}`,
+                })),
+            },
+        });
+    });
+
+    return { nodes, skippedTableNames };
+}
+
+/**
+ * Placement of anything newly added to a canvas.
+ *
+ * Shared so that tables added one at a time and tables added as a preset land on
+ * the same grid instead of two grids at once.
+ */
+export const newNodesPerRow = 3;
+export const newNodeColumnWidthInPixels = 340;
+export const newNodeRowHeightInPixels = 260;
+
+/**
+ * The most nodes one diagram may hold.
+ *
+ * Mirrors `UpdateDiagramDocumentRequest::MAXIMUM_NODES`; the two are held together
+ * by tests/Unit/CanonicalTypeParityTest.php. Stopping here means the canvas never
+ * builds a document the server would refuse.
+ */
+export const maximumNodesPerDiagram = 500;

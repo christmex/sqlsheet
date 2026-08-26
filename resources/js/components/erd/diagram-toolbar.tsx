@@ -1,20 +1,33 @@
 import { Panel, useReactFlow } from '@xyflow/react';
-import { Map, Plus } from 'lucide-react';
+import { Layers, Map, Plus } from 'lucide-react';
 import { useCallback } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { createStickyNoteNode, createTableNode } from '@/lib/erd';
-import type { DiagramNode, RelationEdge } from '@/types';
-
-const newNodeColumnWidthInPixels = 340;
-const newNodeRowHeightInPixels = 260;
-const newNodesPerRow = 3;
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    createStickyNoteNode,
+    createTableNode,
+    maximumNodesPerDiagram,
+    newNodeColumnWidthInPixels,
+    newNodeRowHeightInPixels,
+    newNodesPerRow,
+    nodesFromPreset,
+} from '@/lib/erd';
+import type { DiagramNode, RelationEdge, TablePreset } from '@/types';
 
 type DiagramToolbarProps = {
+    tablePresets: TablePreset[];
     isMinimapVisible: boolean;
     onToggleMinimap: () => void;
 };
 
 export default function DiagramToolbar({
+    tablePresets,
     isMinimapVisible,
     onToggleMinimap,
 }: DiagramToolbarProps) {
@@ -50,10 +63,16 @@ export default function DiagramToolbar({
         [screenToFlowPosition],
     );
 
+    const takenTableNamesOnCanvas = useCallback(
+        () =>
+            getNodes()
+                .filter((node) => node.type === 'table')
+                .map((node) => node.data.name),
+        [getNodes],
+    );
+
     const addTable = useCallback(() => {
-        const takenTableNames = getNodes()
-            .filter((node) => node.type === 'table')
-            .map((node) => node.data.name);
+        const takenTableNames = takenTableNamesOnCanvas();
 
         addNodes(
             createTableNode(
@@ -61,7 +80,48 @@ export default function DiagramToolbar({
                 takenTableNames,
             ),
         );
-    }, [addNodes, getNodes, nextNodePosition]);
+    }, [addNodes, nextNodePosition, takenTableNamesOnCanvas]);
+
+    const addPreset = useCallback(
+        (preset: TablePreset) => {
+            const takenTableNames = takenTableNamesOnCanvas();
+
+            const { nodes, skippedTableNames } = nodesFromPreset(
+                preset,
+                takenTableNames,
+                nextNodePosition(takenTableNames.length),
+            );
+
+            /**
+             * Stop at the ceiling the server enforces. Going past it means every
+             * later save is refused, and the only way back is deleting tables by
+             * hand with nothing saying how many.
+             */
+            const room = maximumNodesPerDiagram - getNodes().length;
+            const roomForNodes = nodes.slice(0, Math.max(room, 0));
+
+            if (roomForNodes.length > 0) {
+                addNodes(roomForNodes);
+            }
+
+            if (roomForNodes.length < nodes.length) {
+                toast.warning(
+                    `This diagram is full at ${maximumNodesPerDiagram} items, so ${nodes.length - roomForNodes.length} tables were left out.`,
+                );
+            }
+
+            if (skippedTableNames.length > 0) {
+                toast.info(
+                    `Already on the canvas, left alone: ${skippedTableNames.join(', ')}`,
+                );
+            }
+
+            if (preset.caveat) {
+                toast.info(preset.caveat);
+            }
+        },
+        [addNodes, getNodes, nextNodePosition, takenTableNamesOnCanvas],
+    );
 
     const addStickyNote = useCallback(() => {
         addNodes(createStickyNoteNode(nextNodePosition(getNodes().length)));
@@ -86,6 +146,36 @@ export default function DiagramToolbar({
                 >
                     <Plus /> Add note
                 </Button>
+                {tablePresets.length > 0 && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                data-test="add-preset"
+                            >
+                                <Layers /> Preset
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-72">
+                            {tablePresets.map((preset) => (
+                                <DropdownMenuItem
+                                    key={preset.key}
+                                    className="flex-col items-start gap-0.5"
+                                    onSelect={() => addPreset(preset)}
+                                    data-test={`add-preset-${preset.key}`}
+                                >
+                                    <span className="font-medium">
+                                        {preset.name}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {preset.description}
+                                    </span>
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
                 <Button
                     size="sm"
                     variant="ghost"

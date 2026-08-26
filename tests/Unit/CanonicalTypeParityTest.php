@@ -4,6 +4,7 @@ use App\Enums\ColumnKeyKind;
 use App\Enums\ColumnKind;
 use App\Enums\DiagramNodeType;
 use App\Enums\RelationCardinality;
+use App\Http\Requests\Diagrams\UpdateDiagramDocumentRequest;
 
 /**
  * Read the TypeScript file that mirrors the PHP enums.
@@ -70,4 +71,13 @@ test('the column key kinds PHP knows about are exactly the ones TypeScript offer
     sort($phpKeys);
 
     expect($typeScriptKeys)->toBe($phpKeys);
+});
+
+test('the canvas stops at the same number of nodes the server accepts', function () {
+    $typeScript = file_get_contents(dirname(__DIR__, 2).'/resources/js/lib/erd.ts');
+
+    preg_match('/export const maximumNodesPerDiagram = (\d+);/', $typeScript, $matches);
+
+    expect($matches[1] ?? null)->not->toBeNull()
+        ->and((int) $matches[1])->toBe(UpdateDiagramDocumentRequest::MAXIMUM_NODES);
 });
