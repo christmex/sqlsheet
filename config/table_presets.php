@@ -61,14 +61,6 @@ return [
                 ],
             ],
             [
-                'name' => 'password_reset_tokens',
-                'columns' => [
-                    $column('email', ColumnKind::String, ['length' => 255], keys: [ColumnKeyKind::Primary]),
-                    $column('token', ColumnKind::String, ['length' => 255]),
-                    $column('created_at', ColumnKind::Timestamp, isNullable: true),
-                ],
-            ],
-            [
                 'name' => 'sessions',
                 'columns' => [
                     $column('id', ColumnKind::String, ['length' => 255], keys: [ColumnKeyKind::Primary]),
@@ -77,6 +69,14 @@ return [
                     $column('user_agent', ColumnKind::Text, isNullable: true),
                     $column('payload', ColumnKind::LongText),
                     $column('last_activity', ColumnKind::Integer),
+                ],
+            ],
+            [
+                'name' => 'password_reset_tokens',
+                'columns' => [
+                    $column('email', ColumnKind::String, ['length' => 255], keys: [ColumnKeyKind::Primary]),
+                    $column('token', ColumnKind::String, ['length' => 255]),
+                    $column('created_at', ColumnKind::Timestamp, isNullable: true),
                 ],
             ],
             [

@@ -630,6 +630,7 @@ export function applyRelationToColumns(
 export function nodesFromPreset(
     preset: TablePreset,
     existingNodes: DiagramNode[],
+    existingEdges: RelationEdge[],
     startPosition: XYPosition,
 ): {
     nodes: StoredTableNode[];
@@ -709,11 +710,28 @@ export function nodesFromPreset(
 
     const edges: RelationEdge[] = [];
 
+    /**
+     * Adding the same preset twice must not draw its relations twice: the tables
+     * are left alone, so the relations between them should be too.
+     */
+    const alreadyRelated = new Set(
+        existingEdges.map(
+            (edge) =>
+                `${columnIdFromHandleId(edge.sourceHandle ?? '')}->${columnIdFromHandleId(edge.targetHandle ?? '')}`,
+        ),
+    );
+
     preset.relations.forEach((relation) => {
         const keyEnd = findColumn(relation.from.table, relation.from.column);
         const referencedEnd = findColumn(relation.to.table, relation.to.column);
 
         if (!keyEnd || !referencedEnd) {
+            return;
+        }
+
+        if (
+            alreadyRelated.has(`${referencedEnd.columnId}->${keyEnd.columnId}`)
+        ) {
             return;
         }
 

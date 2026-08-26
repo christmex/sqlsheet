@@ -38,10 +38,8 @@ export default function DiagramToolbar({
     onToggleMinimap,
 }: DiagramToolbarProps) {
     const [isFindingRelations, setIsFindingRelations] = useState(false);
-    const { addNodes, addEdges, getNodes, screenToFlowPosition } = useReactFlow<
-        DiagramNode,
-        RelationEdge
-    >();
+    const { addNodes, addEdges, getEdges, getNodes, screenToFlowPosition } =
+        useReactFlow<DiagramNode, RelationEdge>();
 
     /**
      * Lay new nodes out in a loose grid starting from what the user is looking at.
@@ -99,6 +97,7 @@ export default function DiagramToolbar({
             const { nodes, edges, skippedTableNames } = nodesFromPreset(
                 preset,
                 currentNodes,
+                getEdges(),
                 nextNodePosition(tableCount),
             );
 
@@ -144,7 +143,7 @@ export default function DiagramToolbar({
                 toast.info(preset.caveat);
             }
         },
-        [addEdges, addNodes, getNodes, nextNodePosition],
+        [addEdges, addNodes, getEdges, getNodes, nextNodePosition],
     );
 
     const addStickyNote = useCallback(() => {
