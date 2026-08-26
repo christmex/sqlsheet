@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import { BookOpen, FolderGit2, LayoutGrid, Table2 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -15,6 +15,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as diagramsIndex } from '@/routes/diagrams';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
@@ -29,6 +30,15 @@ export function AppSidebar() {
             href: dashboardUrl,
             icon: LayoutGrid,
         },
+        ...(page.props.currentTeam
+            ? [
+                  {
+                      title: 'Diagrams',
+                      href: diagramsIndex(page.props.currentTeam.slug),
+                      icon: Table2,
+                  },
+              ]
+            : []),
     ];
 
     const footerNavItems: NavItem[] = [
