@@ -43,7 +43,7 @@ function rowsFor(query: string): Row[] {
 export default function ColumnKindPicker({ value, onChange }: Props) {
     const [isOpen, setIsOpen] = useState(true);
     const [query, setQuery] = useState('');
-    const [highlighted, setHighlighted] = useState(0);
+    const [highlightedIndex, setHighlightedIndex] = useState(0);
     const listRef = useRef<HTMLUListElement>(null);
 
     const rows = useMemo(() => rowsFor(query), [query]);
@@ -56,7 +56,7 @@ export default function ColumnKindPicker({ value, onChange }: Props) {
         listRef.current
             ?.querySelector('[data-highlighted="true"]')
             ?.scrollIntoView({ block: 'nearest' });
-    }, [highlighted, rows]);
+    }, [highlightedIndex, rows]);
 
     const choose = (kind: ColumnKind) => {
         onChange(kind);
@@ -88,13 +88,13 @@ export default function ColumnKindPicker({ value, onChange }: Props) {
                 value={query}
                 onChange={(event) => {
                     setQuery(event.target.value);
-                    setHighlighted(0);
+                    setHighlightedIndex(0);
                 }}
                 onKeyDown={(event) => {
                     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                         event.preventDefault();
 
-                        setHighlighted((current) => {
+                        setHighlightedIndex((current) => {
                             const next =
                                 current + (event.key === 'ArrowDown' ? 1 : -1);
 
@@ -105,9 +105,9 @@ export default function ColumnKindPicker({ value, onChange }: Props) {
                         });
                     }
 
-                    if (event.key === 'Enter' && kinds[highlighted]) {
+                    if (event.key === 'Enter' && kinds[highlightedIndex]) {
                         event.preventDefault();
-                        choose(kinds[highlighted]);
+                        choose(kinds[highlightedIndex]);
                     }
                 }}
             />
@@ -136,15 +136,15 @@ export default function ColumnKindPicker({ value, onChange }: Props) {
                             <button
                                 type="button"
                                 data-highlighted={
-                                    kinds[highlighted] === row.kind
+                                    kinds[highlightedIndex] === row.kind
                                 }
                                 className={cn(
                                     'flex w-full flex-col items-start gap-0.5 rounded-sm px-2 py-1.5 text-left',
-                                    kinds[highlighted] === row.kind &&
+                                    kinds[highlightedIndex] === row.kind &&
                                         'bg-accent',
                                 )}
                                 onMouseEnter={() =>
-                                    setHighlighted(kinds.indexOf(row.kind))
+                                    setHighlightedIndex(kinds.indexOf(row.kind))
                                 }
                                 onClick={() => choose(row.kind)}
                                 data-test={`column-kind-${row.kind}`}

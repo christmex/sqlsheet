@@ -15,6 +15,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAppearance } from '@/hooks/use-appearance';
+import { maximumZoom, minimumZoom } from '@/lib/erd';
 import type { DiagramNode } from '@/types';
 
 const marginInPixels = 80;
@@ -92,8 +93,8 @@ export default function ExportImageMenu({ diagramName }: Props) {
                     bounds,
                     width,
                     height,
-                    0.2,
-                    2,
+                    minimumZoom,
+                    maximumZoom,
                     paddingAroundContent,
                 );
 
