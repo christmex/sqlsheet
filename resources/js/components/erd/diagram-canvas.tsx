@@ -27,7 +27,10 @@ import { useDiagramShortcuts } from '@/hooks/use-diagram-shortcuts';
 import {
     applyRelationToColumns,
     columnIdFromHandleId,
+    maximumZoom,
+    minimumZoom,
     toCanvasEdge,
+    toCanvasNode,
     toStoredEdge,
     toStoredNode,
 } from '@/lib/erd';
@@ -87,7 +90,7 @@ function Canvas({
     const [isShowingShortcuts, setIsShowingShortcuts] = useState(false);
     const [isLegendVisible, setIsLegendVisible] = useState(true);
     const [nodes, setNodes, onNodesChange] = useNodesState<DiagramNode>(
-        initialDocument.nodes,
+        initialDocument.nodes.map(toCanvasNode),
     );
     const [edges, setEdges, onEdgesChange] = useEdgesState<RelationEdge>(
         initialDocument.edges.map(toCanvasEdge),
@@ -230,8 +233,8 @@ function Canvas({
             panOnDrag={[1, 2]}
             snapToGrid
             snapGrid={[16, 16]}
-            minZoom={0.2}
-            maxZoom={2}
+            minZoom={minimumZoom}
+            maxZoom={maximumZoom}
         >
             <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} />
             {isMinimapVisible && (

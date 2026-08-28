@@ -27,7 +27,7 @@ function tableNodeFor(string $nodeId, string $name, array $columns): array
  * @param  array<int, string>  $keys
  * @return array<string, mixed>
  */
-function columnFor(string $id, string $name, array $type, array $keys = [], bool $isNullable = false, ?string $defaultValue = null): array
+function columnFor(string $id, string $name, array $type, array $keys = [], bool $isNullable = false, array $defaultValue = ['kind' => 'none']): array
 {
     return [
         'id' => $id,
@@ -78,7 +78,7 @@ test('every column kind becomes the Blueprint call that creates it', function ()
             columnFor('col_status', 'status', ['kind' => 'enum', 'values' => ['draft', 'sent']]),
             columnFor('col_notes', 'notes', ['kind' => 'text'], [], true),
             columnFor('col_search', 'search', ['kind' => 'raw', 'definition' => 'tsvector']),
-            columnFor('col_placed_at', 'placed_at', ['kind' => 'timestamp'], [], false, 'now'),
+            columnFor('col_placed_at', 'placed_at', ['kind' => 'timestamp'], [], false, ['kind' => 'currentTimestamp']),
         ]),
     ]);
 
@@ -88,7 +88,7 @@ test('every column kind becomes the Blueprint call that creates it', function ()
         ->toContain("\$table->enum('status', ['draft', 'sent']);")
         ->toContain("\$table->text('notes')->nullable();")
         ->toContain("\$table->rawColumn('search', 'tsvector');")
-        ->toContain("\$table->timestamp('placed_at')->default('now');");
+        ->toContain("\$table->timestamp('placed_at')->useCurrent();");
 });
 
 test('a foreign key column constrains itself to the table it points at', function () {
@@ -358,4 +358,95 @@ test('an unenforced relation does not force the table order', function () {
     );
 
     expect($order)->toBe(['sessions', 'users']);
+});
+
+test('an indexed column is written with its index', function () {
+    $files = generateMigrations([
+        tableNodeFor('tbl_sessions', 'sessions', [
+            columnFor('col_activity', 'last_activity', ['kind' => 'integer'], ['index']),
+        ]),
+    ]);
+
+    expect(reset($files))->toContain("\$table->integer('last_activity')->index();");
+});
+
+test('a column defaulting to the current time is written with useCurrent', function () {
+    $files = generateMigrations([
+        tableNodeFor('tbl_failed_jobs', 'failed_jobs', [
+            columnFor('col_failed_at', 'failed_at', ['kind' => 'timestamp'], defaultValue: ['kind' => 'currentTimestamp']),
+        ]),
+    ]);
+
+    expect(reset($files))->toContain("\$table->timestamp('failed_at')->useCurrent();");
+});
+
+test('a literal default is written as a value', function () {
+    $files = generateMigrations([
+        tableNodeFor('tbl_orders', 'orders', [
+            columnFor('col_status', 'status', ['kind' => 'string', 'length' => 20], defaultValue: ['kind' => 'literal', 'value' => 'draft']),
+        ]),
+    ]);
+
+    expect(reset($files))->toContain("\$table->string('status', 20)->default('draft');");
+});
+
+test('a default written before defaults had a shape still exports', function () {
+    $node = tableNodeFor('tbl_orders', 'orders', [
+        columnFor('col_status', 'status', ['kind' => 'string', 'length' => 20]),
+    ]);
+    $node['data']['columns'][0]['defaultValue'] = 'draft';
+
+    $files = generateMigrations([$node]);
+
+    expect(reset($files))->toContain("\$table->string('status', 20)->default('draft');");
+});
+
+test('a default is chained before the constraint it shares a line with', function () {
+    $files = generateMigrations([
+        tableNodeFor('tbl_users', 'users', [columnFor('col_user_id', 'id', ['kind' => 'id'], ['primary'])]),
+        tableNodeFor('tbl_posts', 'posts', [
+            columnFor('col_post_author', 'author_id', ['kind' => 'foreignId'], ['foreign'], defaultValue: ['kind' => 'literal', 'value' => '1']),
+        ]),
+    ], [[
+        'id' => 'rel_author',
+        'source' => 'tbl_users',
+        'target' => 'tbl_posts',
+        'sourceHandle' => 'col_user_id:right',
+        'targetHandle' => 'col_post_author:left',
+        'data' => ['cardinality' => 'one-to-many', 'foreignKeyEnd' => 'target', 'isConstrained' => true],
+    ]]);
+
+    $posts = $files[array_key_last($files)];
+
+    expect($posts)->toContain("\$table->foreignId('author_id')->default('1')->constrained('users');");
+});
+
+test('a stored default that could break out of its quotes is not written', function () {
+    $node = tableNodeFor('tbl_orders', 'orders', [
+        columnFor('col_reference', 'reference', ['kind' => 'string', 'length' => 20]),
+    ]);
+    $node['data']['columns'][0]['defaultValue'] = ['kind' => 'literal', 'value' => 'x\\'];
+
+    $files = generateMigrations([$node]);
+    $migration = reset($files);
+
+    expect($migration)
+        ->not->toContain('->default(')
+        ->toContain('could not be written safely')
+        ->toContain("\$table->string('reference', 20);");
+});
+
+test('a default written before defaults had a shape is held to the same rule', function () {
+    $node = tableNodeFor('tbl_orders', 'orders', [
+        columnFor('col_reference', 'reference', ['kind' => 'string', 'length' => 20]),
+    ]);
+    $node['data']['columns'][0]['defaultValue'] = "a', 'b'); DROP TABLE users; --";
+
+    $files = generateMigrations([$node]);
+    $migration = reset($files);
+
+    expect($migration)
+        ->not->toContain('->default(')
+        ->not->toContain('DROP TABLE')
+        ->toContain('could not be written safely');
 });

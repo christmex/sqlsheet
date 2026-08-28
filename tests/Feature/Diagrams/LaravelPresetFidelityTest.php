@@ -36,7 +36,7 @@ function columnsDeclaredIn(string $migrationPath): array
             // Helpers that stand for several columns are written out in the preset.
             if ($method === 'timestamps') {
                 foreach (['created_at', 'updated_at'] as $timestampColumn) {
-                    $expanded = ['name' => $timestampColumn, 'kind' => 'timestamp', 'isNullable' => true, 'keys' => []];
+                    $expanded = ['name' => $timestampColumn, 'kind' => 'timestamp', 'isNullable' => true, 'keys' => [], 'default' => 'none'];
                     ksort($expanded);
                     $columns[] = $expanded;
                 }
@@ -45,15 +45,15 @@ function columnsDeclaredIn(string $migrationPath): array
             }
 
             if ($method === 'rememberToken') {
-                $rememberToken = ['name' => 'remember_token', 'kind' => 'string', 'length' => 100, 'isNullable' => true, 'keys' => []];
+                $rememberToken = ['name' => 'remember_token', 'kind' => 'string', 'length' => 100, 'isNullable' => true, 'keys' => [], 'default' => 'none'];
                 ksort($rememberToken);
                 $columns[] = $rememberToken;
 
                 continue;
             }
 
-            // A standalone index declaration is not a column, and indexes are a
-            // declared loss of the preset either way.
+            // A standalone declaration names columns that already exist. An index
+            // spanning several columns is the preset's one declared loss.
             if (in_array($method, ['index', 'unique', 'primary'], true)) {
                 continue;
             }
@@ -70,11 +70,16 @@ function columnsDeclaredIn(string $migrationPath): array
                 $keys[] = 'unique';
             }
 
+            if (str_contains($modifiers, '->index(')) {
+                $keys[] = 'index';
+            }
+
             $column = [
                 'name' => $argumentParts[1] ?? $method,
                 'kind' => $method === 'id' ? 'id' : $method,
                 'isNullable' => str_contains($modifiers, '->nullable('),
                 'keys' => $keys,
+                'default' => str_contains($modifiers, '->useCurrent(') ? 'currentTimestamp' : 'none',
             ];
 
             if ($method === 'id') {
@@ -111,6 +116,7 @@ function comparableColumns(array $columns): array
                 'kind' => $column['type']['kind'],
                 'isNullable' => $column['isNullable'],
                 'keys' => $column['keys'],
+                'default' => $column['defaultValue']['kind'],
             ];
 
             if (isset($column['type']['length'])) {

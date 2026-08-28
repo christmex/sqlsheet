@@ -29,7 +29,7 @@ function diagramDocument(array $overrides = []): array
                             'type' => ['kind' => 'bigInteger'],
                             'isNullable' => false,
                             'keys' => ['primary'],
-                            'defaultValue' => null,
+                            'defaultValue' => ['kind' => 'none'],
                         ],
                         [
                             'id' => 'col_users_manager_id',
@@ -37,7 +37,7 @@ function diagramDocument(array $overrides = []): array
                             'type' => ['kind' => 'bigInteger'],
                             'isNullable' => true,
                             'keys' => ['foreign'],
-                            'defaultValue' => null,
+                            'defaultValue' => ['kind' => 'none'],
                         ],
                     ],
                 ],

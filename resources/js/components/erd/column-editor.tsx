@@ -5,9 +5,17 @@ import {
     columnKeyLabels,
     defaultColumnTypeFor,
     formatColumnType,
+    kindsAcceptingCurrentTimestamp,
+    noColumnDefault,
 } from '@/lib/erd';
 import { cn } from '@/lib/utils';
-import type { ColumnKeyKind, ColumnType, TableColumn } from '@/types';
+import type {
+    ColumnDefault,
+    ColumnKeyKind,
+    ColumnKind,
+    ColumnType,
+    TableColumn,
+} from '@/types';
 
 type ColumnEditorProps = {
     column: TableColumn;
@@ -17,7 +25,42 @@ type ColumnEditorProps = {
     onChange: (changes: Partial<TableColumn>) => void;
 };
 
-const keyOrder: ColumnKeyKind[] = ['primary', 'foreign', 'unique'];
+const keyOrder: ColumnKeyKind[] = ['primary', 'foreign', 'unique', 'index'];
+
+/**
+ * The three shapes a default can take.
+ *
+ * "Now" is a call rather than a value, which is why it is its own shape instead
+ * of a magic string the exporter would have to recognise.
+ */
+const defaultChoices: Array<{
+    kind: ColumnDefault['kind'];
+    label: string;
+    title: string;
+    build: (current: ColumnDefault) => ColumnDefault;
+}> = [
+    {
+        kind: 'none',
+        label: '—',
+        title: 'No default',
+        build: () => noColumnDefault,
+    },
+    {
+        kind: 'literal',
+        label: 'value',
+        title: 'A fixed value',
+        build: (current) =>
+            current.kind === 'literal'
+                ? current
+                : { kind: 'literal', value: '' },
+    },
+    {
+        kind: 'currentTimestamp',
+        label: 'now',
+        title: 'The time the row is written',
+        build: () => ({ kind: 'currentTimestamp' }),
+    },
+];
 
 const parameterInputStyles = 'nodrag h-6 w-16 px-1 text-[11px]';
 
@@ -45,10 +88,27 @@ export default function ColumnEditor({
     onClose,
     onChange,
 }: ColumnEditorProps) {
-    const { type, isNullable, keys } = column;
+    const { type, isNullable, keys, defaultValue } = column;
+
+    const availableDefaultChoices = defaultChoices.filter(
+        (choice) =>
+            choice.kind !== 'currentTimestamp' ||
+            kindsAcceptingCurrentTimestamp.includes(type.kind),
+    );
     const containerRef = useRef<HTMLDivElement>(null);
 
     const changeType = (nextType: ColumnType) => onChange({ type: nextType });
+
+    /**
+     * A new kind arrives with no default. A value written for the old kind would
+     * otherwise survive into the migration — a word defaulted onto an integer,
+     * or a current-time default on a column that cannot hold one.
+     */
+    const changeKind = (kind: ColumnKind) =>
+        onChange({
+            type: defaultColumnTypeFor(kind),
+            defaultValue: noColumnDefault,
+        });
 
     const toggleKey = (key: ColumnKeyKind) =>
         onChange({
@@ -112,12 +172,7 @@ export default function ColumnEditor({
                         }
                     }}
                 >
-                    <ColumnKindPicker
-                        value={type.kind}
-                        onChange={(kind) =>
-                            changeType(defaultColumnTypeFor(kind))
-                        }
-                    />
+                    <ColumnKindPicker value={type.kind} onChange={changeKind} />
 
                     {(type.kind === 'char' || type.kind === 'string') && (
                         <Input
@@ -248,6 +303,50 @@ export default function ColumnEditor({
                     >
                         null
                     </button>
+
+                    <span className="mx-0.5 h-5 w-px bg-neutral-200 dark:bg-neutral-700" />
+
+                    <span className="text-[11px] text-muted-foreground">
+                        default
+                    </span>
+
+                    {availableDefaultChoices.map((choice) => (
+                        <button
+                            key={choice.kind}
+                            type="button"
+                            title={choice.title}
+                            data-test={`default-${choice.kind}`}
+                            className={cn(
+                                toggleStyles,
+                                defaultValue.kind === choice.kind
+                                    ? activeToggleStyles
+                                    : inactiveToggleStyles,
+                            )}
+                            onClick={() =>
+                                onChange({
+                                    defaultValue: choice.build(defaultValue),
+                                })
+                            }
+                        >
+                            {choice.label}
+                        </button>
+                    ))}
+
+                    {defaultValue.kind === 'literal' && (
+                        <Input
+                            aria-label="Default value"
+                            className={`${parameterInputStyles} w-28`}
+                            value={defaultValue.value}
+                            onChange={(event) =>
+                                onChange({
+                                    defaultValue: {
+                                        kind: 'literal',
+                                        value: event.target.value,
+                                    },
+                                })
+                            }
+                        />
+                    )}
                 </div>
             )}
         </>

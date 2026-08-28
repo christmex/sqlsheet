@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Diagrams;
 
+use App\Enums\ColumnDefaultKind;
 use App\Enums\ColumnKeyKind;
 use App\Enums\ColumnKind;
 use App\Enums\DiagramNodeType;
@@ -43,8 +44,11 @@ class UpdateDiagramDocumentRequest extends FormRequest
 
     /**
      * Names that can be written into a migration without escaping tricks.
+     *
+     * Every pattern here ends in `D` so that `$` means the end of the value and
+     * not the end of its last line — otherwise a trailing newline slips through.
      */
-    public const string IDENTIFIER_PATTERN = '/^[A-Za-z0-9_][A-Za-z0-9_ -]{0,63}$/';
+    public const string IDENTIFIER_PATTERN = '/^[A-Za-z0-9_][A-Za-z0-9_ -]{0,63}$/D';
 
     /**
      * A raw type definition.
@@ -53,7 +57,7 @@ class UpdateDiagramDocumentRequest extends FormRequest
      * own, so brackets are allowed for array types and nothing else that could
      * end one column and begin another.
      */
-    public const string RAW_DEFINITION_PATTERN = '/^[A-Za-z0-9_ \[\]]{1,64}$/';
+    public const string RAW_DEFINITION_PATTERN = '/^[A-Za-z0-9_ \[\]]{1,64}$/D';
 
     /**
      * A value inside an enum or set.
@@ -62,7 +66,7 @@ class UpdateDiagramDocumentRequest extends FormRequest
      * is already inside, so an apostrophe here would close the string and leave
      * the rest as SQL.
      */
-    public const string ENUM_VALUE_PATTERN = '/^[A-Za-z0-9_ -]{1,64}$/';
+    public const string ENUM_VALUE_PATTERN = '/^[A-Za-z0-9_ -]{1,64}$/D';
 
     /**
      * Get the validation rules that apply to the request.
@@ -90,8 +94,10 @@ class UpdateDiagramDocumentRequest extends FormRequest
             'document.nodes.*.data.columns.*.id' => ['required', 'string', 'max:64'],
             'document.nodes.*.data.columns.*.name' => ['required', 'string', 'regex:'.self::IDENTIFIER_PATTERN],
             'document.nodes.*.data.columns.*.isNullable' => ['required', 'boolean'],
-            'document.nodes.*.data.columns.*.defaultValue' => ['present', 'nullable', 'string', 'max:255'],
-            'document.nodes.*.data.columns.*.keys' => ['present', 'array', 'max:3'],
+            'document.nodes.*.data.columns.*.defaultValue' => ['present', 'array:kind,value'],
+            'document.nodes.*.data.columns.*.defaultValue.kind' => ['required', Rule::enum(ColumnDefaultKind::class)],
+            'document.nodes.*.data.columns.*.defaultValue.value' => ['sometimes', 'string', 'regex:'.ColumnDefaultKind::VALUE_PATTERN],
+            'document.nodes.*.data.columns.*.keys' => ['present', 'array', 'max:'.count(ColumnKeyKind::cases())],
             'document.nodes.*.data.columns.*.keys.*' => ['required', Rule::enum(ColumnKeyKind::class)],
             'document.nodes.*.data.columns.*.type' => ['required', 'array'],
             'document.nodes.*.data.columns.*.type.kind' => ['required', Rule::enum(ColumnKind::class)],
@@ -143,6 +149,7 @@ class UpdateDiagramDocumentRequest extends FormRequest
                 $this->ensureEveryNodeCarriesItsOwnShape($validator, $nodes);
                 $this->ensureTableNamesAreUnique($validator, $nodes);
                 $this->ensureColumnNamesAreUnique($validator, $nodes);
+                $this->ensureDefaultsSuitTheirColumns($validator, $nodes);
                 $this->ensureRelationsPointAtThingsThatExist($validator, $nodes, $edges);
             },
         ];
@@ -224,6 +231,37 @@ class UpdateDiagramDocumentRequest extends FormRequest
                     "document.nodes.{$nodeIndex}.data.columns.{$columnIndex}.name",
                     __('This table has more than one column named ":name".', ['name' => $columnName]),
                 );
+            }
+        }
+    }
+
+    /**
+     * Reject a default the column cannot actually carry.
+     *
+     * A literal needs a value to write, and the current timestamp is only read
+     * on the date and time kinds — asked for anywhere else it would vanish
+     * between the canvas and the exported migration.
+     *
+     * @param  array<int, array<string, mixed>>  $nodes
+     */
+    protected function ensureDefaultsSuitTheirColumns(Validator $validator, array $nodes): void
+    {
+        foreach ($this->tableNodes($nodes) as $nodeIndex => $node) {
+            foreach ($node['data']['columns'] ?? [] as $columnIndex => $column) {
+                $path = "document.nodes.{$nodeIndex}.data.columns.{$columnIndex}.defaultValue";
+                $defaultKind = ColumnDefaultKind::from($column['defaultValue']['kind']);
+
+                if ($defaultKind === ColumnDefaultKind::Literal && ! isset($column['defaultValue']['value'])) {
+                    $validator->errors()->add("{$path}.value", __('A default value needs something to default to.'));
+                }
+
+                if ($defaultKind !== ColumnDefaultKind::CurrentTimestamp) {
+                    continue;
+                }
+
+                if (! ColumnKind::from($column['type']['kind'])->supportsCurrentTimestampDefault()) {
+                    $validator->errors()->add($path, __('Only a date or time column can default to the current timestamp.'));
+                }
             }
         }
     }

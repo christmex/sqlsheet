@@ -54,7 +54,7 @@ function tableNode(string $name, string $suffix = 'a'): array
                 'type' => ['kind' => 'id'],
                 'isNullable' => false,
                 'keys' => ['primary'],
-                'defaultValue' => null,
+                'defaultValue' => ['kind' => 'none'],
             ]],
         ],
     ];
@@ -157,7 +157,7 @@ test('an ordinary column with no keys at all is accepted', function () {
         'type' => ['kind' => 'string', 'length' => 255],
         'isNullable' => false,
         'keys' => [],
-        'defaultValue' => null,
+        'defaultValue' => ['kind' => 'none'],
     ];
 
     saveDocument($this->owner, $this->diagram, documentOfNodes([$node]))->assertOk();
@@ -173,7 +173,7 @@ test('an enum value carrying a quote is refused', function () {
         'type' => ['kind' => 'enum', 'values' => ['draft', "a', 'b'); DROP TABLE users; --"]],
         'isNullable' => false,
         'keys' => [],
-        'defaultValue' => null,
+        'defaultValue' => ['kind' => 'none'],
     ];
 
     saveDocument($this->owner, $this->diagram, documentOfNodes([$node]))
@@ -193,4 +193,58 @@ test('an ordinary raw array type is still allowed', function () {
     $node['data']['columns'][0]['type'] = ['kind' => 'raw', 'definition' => 'uuid[]'];
 
     saveDocument($this->owner, $this->diagram, documentOfNodes([$node]))->assertOk();
+});
+
+test('an indexed column is accepted', function () {
+    $node = tableNode('sessions');
+    $node['data']['columns'][0]['keys'] = ['index'];
+
+    saveDocument($this->owner, $this->diagram, documentOfNodes([$node]))->assertOk();
+
+    expect($this->diagram->fresh()->document['nodes'][0]['data']['columns'][0]['keys'])->toBe(['index']);
+});
+
+test('a default value carrying a quote is refused', function () {
+    $node = tableNode('orders');
+    $node['data']['columns'][0]['defaultValue'] = ['kind' => 'literal', 'value' => "x'); DROP TABLE users; --"];
+
+    saveDocument($this->owner, $this->diagram, documentOfNodes([$node]))
+        ->assertJsonValidationErrors('document.nodes.0.data.columns.0.defaultValue.value');
+});
+
+test('the current time is refused as the default of a column that cannot hold it', function () {
+    $node = tableNode('orders');
+    $node['data']['columns'][] = [
+        'id' => 'col_reference',
+        'name' => 'reference',
+        'type' => ['kind' => 'string', 'length' => 255],
+        'isNullable' => false,
+        'keys' => [],
+        'defaultValue' => ['kind' => 'currentTimestamp'],
+    ];
+
+    saveDocument($this->owner, $this->diagram, documentOfNodes([$node]))
+        ->assertJsonValidationErrors('document.nodes.0.data.columns.1.defaultValue');
+});
+
+test('the current time is accepted as the default of a timestamp column', function () {
+    $node = tableNode('orders');
+    $node['data']['columns'][] = [
+        'id' => 'col_failed_at',
+        'name' => 'failed_at',
+        'type' => ['kind' => 'timestamp'],
+        'isNullable' => false,
+        'keys' => [],
+        'defaultValue' => ['kind' => 'currentTimestamp'],
+    ];
+
+    saveDocument($this->owner, $this->diagram, documentOfNodes([$node]))->assertOk();
+});
+
+test('a literal default with nothing to default to is refused', function () {
+    $node = tableNode('orders');
+    $node['data']['columns'][0]['defaultValue'] = ['kind' => 'literal'];
+
+    saveDocument($this->owner, $this->diagram, documentOfNodes([$node]))
+        ->assertJsonValidationErrors('document.nodes.0.data.columns.0.defaultValue.value');
 });

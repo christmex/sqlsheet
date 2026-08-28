@@ -112,7 +112,19 @@ export type ParameterlessColumnKind =
     | 'geography'
     | 'tsvector';
 
-export type ColumnKeyKind = 'primary' | 'foreign' | 'unique';
+export type ColumnKeyKind = 'primary' | 'foreign' | 'unique' | 'index';
+
+/**
+ * What a column falls back to when a row does not say.
+ *
+ * Deliberately three shapes rather than free text: a default is written straight
+ * into a migration, and "the current time" is a call rather than a value, so the
+ * two cannot share one string without the exporter having to guess which it has.
+ */
+export type ColumnDefault =
+    | { kind: 'none' }
+    | { kind: 'literal'; value: string }
+    | { kind: 'currentTimestamp' };
 
 export type TableColumn = {
     id: string;
@@ -120,7 +132,7 @@ export type TableColumn = {
     type: ColumnType;
     isNullable: boolean;
     keys: ColumnKeyKind[];
-    defaultValue: string | null;
+    defaultValue: ColumnDefault;
 };
 
 export type TableNodeData = {

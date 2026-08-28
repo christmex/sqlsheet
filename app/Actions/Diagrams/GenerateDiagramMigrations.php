@@ -2,6 +2,7 @@
 
 namespace App\Actions\Diagrams;
 
+use App\Enums\ColumnDefaultKind;
 use App\Enums\ColumnKeyKind;
 use App\Enums\ColumnKind;
 use App\Enums\DiagramNodeType;
@@ -30,6 +31,16 @@ class GenerateDiagramMigrations
         ColumnKind::MediumIncrements->value,
         ColumnKind::BigIncrements->value,
     ];
+
+    /**
+     * What is left in place of a default the exporter refused to write.
+     *
+     * Dropping it without a word would hand over a migration whose schema is
+     * quietly different from the diagram it was exported from. The value itself
+     * is never repeated here: the reason it was refused is that it can carry
+     * characters that would break out of whatever encloses them.
+     */
+    protected const string UNWRITABLE_DEFAULT_NOTICE = "// A default stored for this column could not be written safely and was left off.\n            ";
 
     /**
      * Kinds that carry their own foreign key constraint through `constrained()`.
@@ -332,8 +343,15 @@ class GenerateDiagramMigrations
             $line .= '->primary()';
         }
 
-        if (($column['defaultValue'] ?? null) !== null) {
-            $line .= sprintf('->default(%s)', $this->quoted($column['defaultValue']));
+        if (in_array(ColumnKeyKind::Index->value, $column['keys'] ?? [], true)) {
+            $line .= '->index()';
+        }
+
+        $modifier = $this->defaultModifier($column);
+        $line .= $modifier;
+
+        if ($modifier === '' && $this->wantsADefault($column)) {
+            $line = self::UNWRITABLE_DEFAULT_NOTICE.$line;
         }
 
         if ($relation !== null && $relation['isConstrained'] && in_array($kind, self::SELF_CONSTRAINING_KINDS, true)) {
@@ -341,6 +359,71 @@ class GenerateDiagramMigrations
         }
 
         return $line.';';
+    }
+
+    /**
+     * Build the modifier that gives a column its default, if it has one.
+     *
+     * Documents written before a default had a shape hold a plain string, and
+     * those diagrams still have to export.
+     *
+     * @param  array<string, mixed>  $column
+     */
+    protected function defaultModifier(array $column): string
+    {
+        $default = $column['defaultValue'] ?? null;
+
+        if (is_string($default)) {
+            $default = $default === ''
+                ? ['kind' => ColumnDefaultKind::None->value]
+                : ['kind' => ColumnDefaultKind::Literal->value, 'value' => $default];
+        }
+
+        if (! is_array($default)) {
+            return '';
+        }
+
+        return match (ColumnDefaultKind::tryFrom($default['kind'] ?? '')) {
+            ColumnDefaultKind::Literal => $this->literalDefault((string) ($default['value'] ?? '')),
+            ColumnDefaultKind::CurrentTimestamp => '->useCurrent()',
+            default => '',
+        };
+    }
+
+    /**
+     * Write a literal default, or nothing if it cannot be written safely.
+     *
+     * Laravel quotes a default by doubling apostrophes and nothing else, so a
+     * value ending in a backslash would swallow its own closing quote and leave
+     * the rest of the CREATE TABLE running as DDL on whoever's database this
+     * migration is finally run against. Saving such a value is refused, but
+     * documents stored before that rule existed still hold whatever was typed,
+     * and this is what stands between them and the generated file.
+     */
+    protected function literalDefault(string $value): string
+    {
+        if (preg_match(ColumnDefaultKind::VALUE_PATTERN, $value) !== 1) {
+            return '';
+        }
+
+        return sprintf('->default(%s)', $this->quoted($value));
+    }
+
+    /**
+     * Whether the column asked for a default at all.
+     *
+     * @param  array<string, mixed>  $column
+     */
+    protected function wantsADefault(array $column): bool
+    {
+        $default = $column['defaultValue'] ?? null;
+
+        if (is_string($default)) {
+            return $default !== '';
+        }
+
+        return is_array($default)
+            && ColumnDefaultKind::tryFrom($default['kind'] ?? '') === ColumnDefaultKind::Literal;
     }
 
     /**

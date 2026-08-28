@@ -2,6 +2,7 @@ import type { XYPosition } from '@xyflow/react';
 import { nanoid } from 'nanoid';
 import type {
     ColumnHandleSide,
+    ColumnDefault,
     ColumnKeyKind,
     ColumnKind,
     ColumnType,
@@ -349,10 +350,37 @@ export function canonicalDocumentJson(
     );
 }
 
+/** A column with nothing to fall back on. */
+/**
+ * How far the canvas may be zoomed, on screen and when exported as a picture.
+ */
+export const minimumZoom = 0.2;
+
+export const maximumZoom = 2;
+
+export const noColumnDefault: ColumnDefault = { kind: 'none' };
+
+/**
+ * The kinds where defaulting to the current time actually reaches the database.
+ *
+ * Mirrors `ColumnKind::supportsCurrentTimestampDefault()`. Laravel only reads
+ * `useCurrent()` inside its date and time types and drops it silently anywhere
+ * else, so the choice is not offered on a column that would lose it.
+ */
+export const kindsAcceptingCurrentTimestamp: ColumnKind[] = [
+    'date',
+    'dateTime',
+    'dateTimeTz',
+    'timestamp',
+    'timestampTz',
+    'year',
+];
+
 export const columnKeyLabels: Record<ColumnKeyKind, string> = {
     primary: 'PK',
     foreign: 'FK',
     unique: 'UQ',
+    index: 'IX',
 };
 
 export const tableHeaderColors = [
@@ -395,7 +423,7 @@ export function createTableColumn(takenColumnNames: string[]): TableColumn {
         type: { kind: 'string', length: 255 },
         isNullable: false,
         keys: [],
-        defaultValue: null,
+        defaultValue: noColumnDefault,
     };
 }
 
@@ -420,7 +448,7 @@ export function createTableNode(
                     type: { kind: 'id' },
                     isNullable: false,
                     keys: ['primary'],
-                    defaultValue: null,
+                    defaultValue: noColumnDefault,
                 },
             ],
         },
@@ -610,7 +638,7 @@ export function applyRelationToColumns(
                               // A default written for the previous type would
                               // survive into the migration as, say, a word
                               // defaulted onto an integer column.
-                              defaultValue: null,
+                              defaultValue: noColumnDefault,
                           }
                         : column,
                 ),
@@ -902,4 +930,47 @@ export function canonicalDrawingJson(
         edges,
         viewport: { x: 0, y: 0, zoom: 1 },
     });
+}
+
+/**
+ * Bring a stored column up to the shape the editor works in.
+ *
+ * Documents written before a default had a shape carry `null` or a bare string,
+ * and they have to keep opening.
+ */
+function withReadableDefault(column: TableColumn): TableColumn {
+    const stored = column.defaultValue as unknown;
+
+    if (stored === null || stored === undefined) {
+        return { ...column, defaultValue: noColumnDefault };
+    }
+
+    if (typeof stored === 'string') {
+        return {
+            ...column,
+            defaultValue:
+                stored === ''
+                    ? noColumnDefault
+                    : { kind: 'literal', value: stored },
+        };
+    }
+
+    return column;
+}
+
+/**
+ * Hand a stored node to the canvas, bringing its columns up to date on the way.
+ */
+export function toCanvasNode(node: StoredDiagramNode): DiagramNode {
+    if (node.type !== 'table') {
+        return node;
+    }
+
+    return {
+        ...node,
+        data: {
+            ...node.data,
+            columns: node.data.columns.map(withReadableDefault),
+        },
+    };
 }

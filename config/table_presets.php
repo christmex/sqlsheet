@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ColumnDefaultKind;
 use App\Enums\ColumnKeyKind;
 use App\Enums\ColumnKind;
 
@@ -8,7 +9,7 @@ use App\Enums\ColumnKind;
  *
  * Every definition here was read from this application's own skeleton migrations
  * rather than recalled, because a preset that is subtly wrong is worse than no
- * preset: it looks right. `tests/Feature/Diagrams/LaravelPresetTest.php` compares
+ * preset: it looks right. `tests/Feature/Diagrams/LaravelPresetFidelityTest.php` compares
  * the two column by column so they cannot drift apart quietly.
  */
 $column = function (
@@ -17,13 +18,14 @@ $column = function (
     array $typeParameters = [],
     array $keys = [],
     bool $isNullable = false,
+    ColumnDefaultKind $defaultKind = ColumnDefaultKind::None,
 ): array {
     return [
         'name' => $name,
         'type' => ['kind' => $kind->value] + $typeParameters,
         'isNullable' => $isNullable,
         'keys' => array_map(fn (ColumnKeyKind $key) => $key->value, $keys),
-        'defaultValue' => null,
+        'defaultValue' => ['kind' => $defaultKind->value],
     ];
 };
 
@@ -32,7 +34,7 @@ return [
         'key' => 'laravel-13',
         'name' => 'Laravel 13',
         'description' => 'The eight tables a new Laravel 13 project already has.',
-        'caveat' => 'Three things a diagram cannot draw yet are left out: indexes, including the one spanning three columns on failed_jobs; the timestamps pair is written out as two columns; and the current-time default on failed_at is not carried over.',
+        'caveat' => 'One thing a diagram cannot draw yet is left out: the index on failed_jobs that spans connection, queue and failed_at together. Single-column indexes are all here.',
         /**
          * Laravel's own migrations declare no foreign key constraints at all —
          * `sessions.user_id` is a `foreignId` column with an index and nothing
@@ -64,11 +66,11 @@ return [
                 'name' => 'sessions',
                 'columns' => [
                     $column('id', ColumnKind::String, ['length' => 255], keys: [ColumnKeyKind::Primary]),
-                    $column('user_id', ColumnKind::ForeignId, isNullable: true),
+                    $column('user_id', ColumnKind::ForeignId, keys: [ColumnKeyKind::Index], isNullable: true),
                     $column('ip_address', ColumnKind::String, ['length' => 45], isNullable: true),
                     $column('user_agent', ColumnKind::Text, isNullable: true),
                     $column('payload', ColumnKind::LongText),
-                    $column('last_activity', ColumnKind::Integer),
+                    $column('last_activity', ColumnKind::Integer, keys: [ColumnKeyKind::Index]),
                 ],
             ],
             [
@@ -84,7 +86,7 @@ return [
                 'columns' => [
                     $column('key', ColumnKind::String, ['length' => 255], keys: [ColumnKeyKind::Primary]),
                     $column('value', ColumnKind::MediumText),
-                    $column('expiration', ColumnKind::BigInteger),
+                    $column('expiration', ColumnKind::BigInteger, keys: [ColumnKeyKind::Index]),
                 ],
             ],
             [
@@ -92,14 +94,14 @@ return [
                 'columns' => [
                     $column('key', ColumnKind::String, ['length' => 255], keys: [ColumnKeyKind::Primary]),
                     $column('owner', ColumnKind::String, ['length' => 255]),
-                    $column('expiration', ColumnKind::BigInteger),
+                    $column('expiration', ColumnKind::BigInteger, keys: [ColumnKeyKind::Index]),
                 ],
             ],
             [
                 'name' => 'jobs',
                 'columns' => [
                     $column('id', ColumnKind::Id, keys: [ColumnKeyKind::Primary]),
-                    $column('queue', ColumnKind::String, ['length' => 255]),
+                    $column('queue', ColumnKind::String, ['length' => 255], keys: [ColumnKeyKind::Index]),
                     $column('payload', ColumnKind::LongText),
                     $column('attempts', ColumnKind::UnsignedSmallInteger),
                     $column('reserved_at', ColumnKind::UnsignedInteger, isNullable: true),
@@ -131,7 +133,7 @@ return [
                     $column('queue', ColumnKind::String, ['length' => 255]),
                     $column('payload', ColumnKind::LongText),
                     $column('exception', ColumnKind::LongText),
-                    $column('failed_at', ColumnKind::Timestamp),
+                    $column('failed_at', ColumnKind::Timestamp, defaultKind: ColumnDefaultKind::CurrentTimestamp),
                 ],
             ],
         ],

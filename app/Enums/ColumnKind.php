@@ -77,4 +77,23 @@ enum ColumnKind: string
     {
         return array_column(self::cases(), 'value');
     }
+
+    /**
+     * Whether `useCurrent()` does anything on this kind.
+     *
+     * Laravel only reads the flag inside the date, datetime, timestamp and year
+     * type methods. Chained onto anything else it is dropped without a word, so
+     * a column that cannot use it must not be allowed to ask for it.
+     */
+    public function supportsCurrentTimestampDefault(): bool
+    {
+        return in_array($this, [
+            self::Date,
+            self::DateTime,
+            self::DateTimeTz,
+            self::Timestamp,
+            self::TimestampTz,
+            self::Year,
+        ], true);
+    }
 }

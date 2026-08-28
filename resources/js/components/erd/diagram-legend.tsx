@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
  * guessable. It is explained in one place and shown in two — here on the canvas
  * and in the help dialog — so the two can never drift apart.
  */
-export const legendItems: Array<{ mark: ReactNode; meaning: string }> = [
+const legendItems: Array<{ mark: ReactNode; meaning: string }> = [
     {
         mark: (
             <svg width="28" height="8" aria-hidden>
@@ -51,7 +51,8 @@ export const legendItems: Array<{ mark: ReactNode; meaning: string }> = [
                 PK
             </span>
         ),
-        meaning: 'Primary key. FK is a foreign key, UQ is unique.',
+        meaning:
+            'Primary key. FK is a foreign key, UQ is unique, IX is indexed.',
     },
 ];
 

@@ -29,6 +29,7 @@ const keyStyles: Record<ColumnKeyKind, string> = {
         'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300',
     foreign: 'bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300',
     unique: 'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300',
+    index: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-700/40 dark:text-neutral-300',
 };
 
 /**
@@ -136,8 +137,8 @@ function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
                             type="button"
                             aria-label={`Keys on ${column.name}`}
                             data-test="column-keys"
-                            title="Primary, foreign and unique keys"
-                            className="nodrag flex w-11 shrink-0 cursor-pointer gap-1"
+                            title="Keys and indexes on this column"
+                            className="nodrag flex w-14 shrink-0 cursor-pointer gap-1"
                             onClick={() => setEditingColumnId(column.id)}
                         >
                             {column.keys.length === 0 ? (
