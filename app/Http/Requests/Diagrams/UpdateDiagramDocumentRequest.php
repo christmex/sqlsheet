@@ -90,7 +90,7 @@ class UpdateDiagramDocumentRequest extends FormRequest
 
             'document.nodes.*.data.name' => ['sometimes', 'string', 'regex:'.self::IDENTIFIER_PATTERN],
             'document.nodes.*.data.headerColor' => ['sometimes', 'string', 'max:32'],
-            'document.nodes.*.data.columns' => ['sometimes', 'array', 'max:'.self::MAXIMUM_COLUMNS_PER_TABLE],
+            'document.nodes.*.data.columns' => ['sometimes', 'array', 'min:1', 'max:'.self::MAXIMUM_COLUMNS_PER_TABLE],
             'document.nodes.*.data.columns.*.id' => ['required', 'string', 'max:64'],
             'document.nodes.*.data.columns.*.name' => ['required', 'string', 'regex:'.self::IDENTIFIER_PATTERN],
             'document.nodes.*.data.columns.*.isNullable' => ['required', 'boolean'],

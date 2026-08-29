@@ -358,6 +358,14 @@ export const minimumZoom = 0.2;
 
 export const maximumZoom = 2;
 
+/**
+ * Said when the last column of a table would be taken away. A table with no
+ * columns is refused when the diagram is saved, and an exported migration that
+ * creates nothing would fail on the way in.
+ */
+export const lastColumnNotice =
+    'A table needs at least one column. Delete the table itself instead.';
+
 export const noColumnDefault: ColumnDefault = { kind: 'none' };
 
 /**
@@ -381,6 +389,20 @@ export const columnKeyLabels: Record<ColumnKeyKind, string> = {
     foreign: 'FK',
     unique: 'UQ',
     index: 'IX',
+};
+
+/**
+ * What each of those two letters actually means, for the panel that offers them.
+ *
+ * The abbreviations are the convention every diagram uses and are worth keeping,
+ * but nobody is born knowing them.
+ */
+export const columnKeyDescriptions: Record<ColumnKeyKind, string> = {
+    primary:
+        'Primary key: the value that tells one row apart from every other row in this table.',
+    foreign: 'Foreign key: this column points at a row in another table.',
+    unique: 'Unique: no two rows in this table may hold the same value here.',
+    index: 'Index: the database keeps a lookup for this column, so searching by it stays fast as the table grows.',
 };
 
 export const tableHeaderColors = [

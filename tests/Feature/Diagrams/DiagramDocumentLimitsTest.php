@@ -248,3 +248,11 @@ test('a literal default with nothing to default to is refused', function () {
     saveDocument($this->owner, $this->diagram, documentOfNodes([$node]))
         ->assertJsonValidationErrors('document.nodes.0.data.columns.0.defaultValue.value');
 });
+
+test('a table with no columns left is refused', function () {
+    $node = tableNode('orders');
+    $node['data']['columns'] = [];
+
+    saveDocument($this->owner, $this->diagram, documentOfNodes([$node]))
+        ->assertJsonValidationErrors('document.nodes.0.data.columns');
+});

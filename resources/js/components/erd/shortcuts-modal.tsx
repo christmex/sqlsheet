@@ -27,7 +27,7 @@ const shortcutGroups = [
         shortcuts: [
             ['Cmd / Ctrl + A', 'Select every table, note and relation'],
             ['Drag on empty canvas', 'Draw a selection box'],
-            ['Shift + click', 'Add to the selection'],
+            ['Shift + click a table header', 'Add that table to the selection'],
         ],
     },
     {
@@ -45,7 +45,17 @@ const shortcutGroups = [
             ['Click a type', 'Change the type, length and nullability'],
             [
                 'Click the key slot on the left',
-                'Set primary, foreign or unique',
+                'Set primary, foreign, unique or indexed',
+            ],
+            ['Click a column', 'Pick it out'],
+            ['Shift + click columns', 'Pick out several at once'],
+            [
+                'Backspace, with columns picked out',
+                'Delete every column picked out',
+            ],
+            [
+                'Drag the grip, or focus it and press ↑ / ↓',
+                'Reorder a column, or the whole group picked out',
             ],
             ['Drag between two connection points', 'Draw a relation'],
         ],

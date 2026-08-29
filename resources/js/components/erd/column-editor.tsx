@@ -2,6 +2,13 @@ import { useEffect, useRef } from 'react';
 import ColumnKindPicker from '@/components/erd/column-kind-picker';
 import { Input } from '@/components/ui/input';
 import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+    columnKeyDescriptions,
     columnKeyLabels,
     defaultColumnTypeFor,
     formatColumnType,
@@ -42,13 +49,13 @@ const defaultChoices: Array<{
     {
         kind: 'none',
         label: '—',
-        title: 'No default',
+        title: 'No default: a row that says nothing about this column stores nothing here.',
         build: () => noColumnDefault,
     },
     {
         kind: 'literal',
         label: 'value',
-        title: 'A fixed value',
+        title: 'A fixed value the database writes whenever a row says nothing about this column.',
         build: (current) =>
             current.kind === 'literal'
                 ? current
@@ -57,7 +64,7 @@ const defaultChoices: Array<{
     {
         kind: 'currentTimestamp',
         label: 'now',
-        title: 'The time the row is written',
+        title: 'The database fills this in with the moment the row is written.',
         build: () => ({ kind: 'currentTimestamp' }),
     },
 ];
@@ -153,7 +160,7 @@ export default function ColumnEditor({
         <>
             <span
                 className="shrink-0 cursor-pointer font-mono text-[11px] text-neutral-400 dark:text-neutral-500"
-                title="Column type"
+                title="The kind of data this column holds. Click to change it."
                 onClick={onOpen}
             >
                 {formatColumnType(type)}
@@ -161,193 +168,232 @@ export default function ColumnEditor({
             </span>
 
             {isOpen && (
-                <div
-                    ref={containerRef}
-                    className="nodrag nopan absolute top-full left-0 z-10 mt-1 flex w-max items-center gap-1 rounded-md border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
-                    onKeyDown={(event) => {
-                        event.stopPropagation();
+                <TooltipProvider delayDuration={300}>
+                    <div
+                        ref={containerRef}
+                        className="nodrag nopan absolute top-full left-0 z-10 mt-1 flex w-max items-center gap-1 rounded-md border border-neutral-200 bg-white p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+                        onKeyDown={(event) => {
+                            event.stopPropagation();
 
-                        if (event.key === 'Enter' || event.key === 'Escape') {
-                            onClose();
-                        }
-                    }}
-                >
-                    <ColumnKindPicker value={type.kind} onChange={changeKind} />
-
-                    {(type.kind === 'char' || type.kind === 'string') && (
-                        <Input
-                            type="number"
-                            aria-label="Length"
-                            className={parameterInputStyles}
-                            value={type.length}
-                            onChange={(event) =>
-                                changeType({
-                                    ...type,
-                                    length: Number(event.target.value) || 1,
-                                })
+                            if (
+                                event.key === 'Enter' ||
+                                event.key === 'Escape'
+                            ) {
+                                onClose();
                             }
+                        }}
+                    >
+                        <ColumnKindPicker
+                            value={type.kind}
+                            onChange={changeKind}
                         />
-                    )}
 
-                    {(type.kind === 'float' ||
-                        type.kind === 'double' ||
-                        type.kind === 'decimal') && (
-                        <>
+                        {(type.kind === 'char' || type.kind === 'string') && (
                             <Input
                                 type="number"
-                                aria-label="Precision"
+                                aria-label="Length"
                                 className={parameterInputStyles}
-                                value={type.precision}
+                                value={type.length}
                                 onChange={(event) =>
                                     changeType({
                                         ...type,
-                                        precision:
+                                        length: Number(event.target.value) || 1,
+                                    })
+                                }
+                            />
+                        )}
+
+                        {(type.kind === 'float' ||
+                            type.kind === 'double' ||
+                            type.kind === 'decimal') && (
+                            <>
+                                <Input
+                                    type="number"
+                                    aria-label="Precision"
+                                    className={parameterInputStyles}
+                                    value={type.precision}
+                                    onChange={(event) =>
+                                        changeType({
+                                            ...type,
+                                            precision:
+                                                Number(event.target.value) || 1,
+                                        })
+                                    }
+                                />
+                                <Input
+                                    type="number"
+                                    aria-label="Scale"
+                                    className={parameterInputStyles}
+                                    value={type.scale}
+                                    onChange={(event) =>
+                                        changeType({
+                                            ...type,
+                                            scale:
+                                                Number(event.target.value) || 0,
+                                        })
+                                    }
+                                />
+                            </>
+                        )}
+
+                        {(type.kind === 'enum' || type.kind === 'set') && (
+                            <Input
+                                aria-label="Allowed values"
+                                className={`${parameterInputStyles} w-32`}
+                                value={type.values.join(',')}
+                                onChange={(event) =>
+                                    changeType({
+                                        ...type,
+                                        values: event.target.value
+                                            .split(',')
+                                            .map((value) => value.trim())
+                                            .filter((value) => value !== ''),
+                                    })
+                                }
+                            />
+                        )}
+
+                        {type.kind === 'vector' && (
+                            <Input
+                                type="number"
+                                aria-label="Dimensions"
+                                className={parameterInputStyles}
+                                value={type.dimensions}
+                                onChange={(event) =>
+                                    changeType({
+                                        ...type,
+                                        dimensions:
                                             Number(event.target.value) || 1,
                                     })
                                 }
                             />
+                        )}
+
+                        {type.kind === 'raw' && (
                             <Input
-                                type="number"
-                                aria-label="Scale"
-                                className={parameterInputStyles}
-                                value={type.scale}
+                                aria-label="Raw definition"
+                                className={`${parameterInputStyles} w-32`}
+                                value={type.definition}
                                 onChange={(event) =>
                                     changeType({
                                         ...type,
-                                        scale: Number(event.target.value) || 0,
+                                        definition: event.target.value,
                                     })
                                 }
                             />
-                        </>
-                    )}
-
-                    {(type.kind === 'enum' || type.kind === 'set') && (
-                        <Input
-                            aria-label="Allowed values"
-                            className={`${parameterInputStyles} w-32`}
-                            value={type.values.join(',')}
-                            onChange={(event) =>
-                                changeType({
-                                    ...type,
-                                    values: event.target.value
-                                        .split(',')
-                                        .map((value) => value.trim())
-                                        .filter((value) => value !== ''),
-                                })
-                            }
-                        />
-                    )}
-
-                    {type.kind === 'vector' && (
-                        <Input
-                            type="number"
-                            aria-label="Dimensions"
-                            className={parameterInputStyles}
-                            value={type.dimensions}
-                            onChange={(event) =>
-                                changeType({
-                                    ...type,
-                                    dimensions: Number(event.target.value) || 1,
-                                })
-                            }
-                        />
-                    )}
-
-                    {type.kind === 'raw' && (
-                        <Input
-                            aria-label="Raw definition"
-                            className={`${parameterInputStyles} w-32`}
-                            value={type.definition}
-                            onChange={(event) =>
-                                changeType({
-                                    ...type,
-                                    definition: event.target.value,
-                                })
-                            }
-                        />
-                    )}
-
-                    <span className="mx-0.5 h-5 w-px bg-neutral-200 dark:bg-neutral-700" />
-
-                    {keyOrder.map((key) => (
-                        <button
-                            key={key}
-                            type="button"
-                            aria-label={columnKeyLabels[key]}
-                            data-test={`toggle-${key}`}
-                            title={`Toggle ${columnKeyLabels[key]}`}
-                            className={cn(
-                                toggleStyles,
-                                keys.includes(key)
-                                    ? activeToggleStyles
-                                    : inactiveToggleStyles,
-                            )}
-                            onClick={() => toggleKey(key)}
-                        >
-                            {columnKeyLabels[key]}
-                        </button>
-                    ))}
-
-                    <button
-                        type="button"
-                        aria-label="Nullable"
-                        data-test="toggle-nullable"
-                        title="Can this column be null?"
-                        className={cn(
-                            toggleStyles,
-                            isNullable
-                                ? activeToggleStyles
-                                : inactiveToggleStyles,
                         )}
-                        onClick={() => onChange({ isNullable: !isNullable })}
-                    >
-                        null
-                    </button>
 
-                    <span className="mx-0.5 h-5 w-px bg-neutral-200 dark:bg-neutral-700" />
+                        <span className="mx-0.5 h-5 w-px bg-neutral-200 dark:bg-neutral-700" />
 
-                    <span className="text-[11px] text-muted-foreground">
-                        default
-                    </span>
+                        {keyOrder.map((key) => (
+                            <Tooltip key={key}>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        aria-label={columnKeyDescriptions[key]}
+                                        data-test={`toggle-${key}`}
+                                        className={cn(
+                                            toggleStyles,
+                                            keys.includes(key)
+                                                ? activeToggleStyles
+                                                : inactiveToggleStyles,
+                                        )}
+                                        onClick={() => toggleKey(key)}
+                                    >
+                                        {columnKeyLabels[key]}
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-64">
+                                    {columnKeyDescriptions[key]}
+                                </TooltipContent>
+                            </Tooltip>
+                        ))}
 
-                    {availableDefaultChoices.map((choice) => (
-                        <button
-                            key={choice.kind}
-                            type="button"
-                            title={choice.title}
-                            data-test={`default-${choice.kind}`}
-                            className={cn(
-                                toggleStyles,
-                                defaultValue.kind === choice.kind
-                                    ? activeToggleStyles
-                                    : inactiveToggleStyles,
-                            )}
-                            onClick={() =>
-                                onChange({
-                                    defaultValue: choice.build(defaultValue),
-                                })
-                            }
-                        >
-                            {choice.label}
-                        </button>
-                    ))}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    aria-label="Allow this column to hold nothing"
+                                    data-test="toggle-nullable"
+                                    className={cn(
+                                        toggleStyles,
+                                        isNullable
+                                            ? activeToggleStyles
+                                            : inactiveToggleStyles,
+                                    )}
+                                    onClick={() =>
+                                        onChange({ isNullable: !isNullable })
+                                    }
+                                >
+                                    null
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-64">
+                                Nullable: rows are allowed to leave this column
+                                empty. Without it every row must hold a value.
+                            </TooltipContent>
+                        </Tooltip>
 
-                    {defaultValue.kind === 'literal' && (
-                        <Input
-                            aria-label="Default value"
-                            className={`${parameterInputStyles} w-28`}
-                            value={defaultValue.value}
-                            onChange={(event) =>
-                                onChange({
-                                    defaultValue: {
-                                        kind: 'literal',
-                                        value: event.target.value,
-                                    },
-                                })
-                            }
-                        />
-                    )}
-                </div>
+                        <span className="mx-0.5 h-5 w-px bg-neutral-200 dark:bg-neutral-700" />
+
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="cursor-help text-[11px] text-muted-foreground">
+                                    default
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-64">
+                                What the database writes into this column when a
+                                new row says nothing about it.
+                            </TooltipContent>
+                        </Tooltip>
+
+                        {availableDefaultChoices.map((choice) => (
+                            <Tooltip key={choice.kind}>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        aria-label={choice.title}
+                                        data-test={`default-${choice.kind}`}
+                                        className={cn(
+                                            toggleStyles,
+                                            defaultValue.kind === choice.kind
+                                                ? activeToggleStyles
+                                                : inactiveToggleStyles,
+                                        )}
+                                        onClick={() =>
+                                            onChange({
+                                                defaultValue:
+                                                    choice.build(defaultValue),
+                                            })
+                                        }
+                                    >
+                                        {choice.label}
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-64">
+                                    {choice.title}
+                                </TooltipContent>
+                            </Tooltip>
+                        ))}
+
+                        {defaultValue.kind === 'literal' && (
+                            <Input
+                                aria-label="Default value"
+                                className={`${parameterInputStyles} w-28`}
+                                value={defaultValue.value}
+                                onChange={(event) =>
+                                    onChange({
+                                        defaultValue: {
+                                            kind: 'literal',
+                                            value: event.target.value,
+                                        },
+                                    })
+                                }
+                            />
+                        )}
+                    </div>
+                </TooltipProvider>
             )}
         </>
     );

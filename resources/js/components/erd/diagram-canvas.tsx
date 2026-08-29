@@ -15,6 +15,7 @@ import type { DefaultEdgeOptions, OnConnect, Viewport } from '@xyflow/react';
 import { nanoid } from 'nanoid';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { toast } from 'sonner';
 import DiagramLegend from '@/components/erd/diagram-legend';
 import DiagramToolbar from '@/components/erd/diagram-toolbar';
 import RelationEdgeComponent from '@/components/erd/relation-edge';
@@ -22,11 +23,16 @@ import ShortcutsModal from '@/components/erd/shortcuts-modal';
 import StickyNoteNode from '@/components/erd/sticky-note-node';
 import TableNode from '@/components/erd/table-node';
 import { useAppearance } from '@/hooks/use-appearance';
+import {
+    ColumnSelectionProvider,
+    useColumnSelection,
+} from '@/hooks/use-column-selection';
 import { useDiagramHistory } from '@/hooks/use-diagram-history';
 import { useDiagramShortcuts } from '@/hooks/use-diagram-shortcuts';
 import {
     applyRelationToColumns,
     columnIdFromHandleId,
+    lastColumnNotice,
     maximumZoom,
     minimumZoom,
     toCanvasEdge,
@@ -59,6 +65,16 @@ const edgeTypes = {
  */
 const relationStroke = '#94a3b8';
 
+/**
+ * Holding any of these while clicking adds to the selection instead of
+ * replacing it.
+ *
+ * React Flow listens for Cmd on a Mac and Ctrl elsewhere, and neither is what
+ * people reach for. Shift is, and it comes at no cost: the three are alternatives
+ * rather than a combination.
+ */
+const multiSelectionKeys = ['Shift', 'Meta', 'Control'];
+
 const defaultEdgeOptions: DefaultEdgeOptions = {
     type: 'relation',
     markerEnd: {
@@ -86,6 +102,7 @@ function Canvas({
     children,
 }: DiagramCanvasProps) {
     const { resolvedAppearance } = useAppearance();
+    const { selection: columnSelection, clearSelection } = useColumnSelection();
     const [isMinimapVisible, setIsMinimapVisible] = useState(true);
     const [isShowingShortcuts, setIsShowingShortcuts] = useState(false);
     const [isLegendVisible, setIsLegendVisible] = useState(true);
@@ -111,13 +128,6 @@ function Canvas({
             currentEdges.map((edge) => ({ ...edge, selected: true })),
         );
     }, [setEdges, setNodes]);
-
-    useDiagramShortcuts({
-        onUndo: undo,
-        onRedo: redo,
-        onSelectEverything: selectEverything,
-        onShowShortcuts: () => setIsShowingShortcuts(true),
-    });
 
     const viewportRef = useRef<Viewport>(initialDocument.viewport);
     const nodesRef = useRef(nodes);
@@ -160,6 +170,99 @@ function Canvas({
 
         reportDocument();
     }, [edges, nodes, reportDocument]);
+
+    /**
+     * Take out every column that is picked out, and every relation that ended on
+     * one of them. A relation pointing at a column that no longer exists is
+     * refused by the server, which would stop the diagram saving until the page
+     * is reloaded.
+     */
+    const removeSelectedColumns = useCallback(() => {
+        if (columnSelection === null) {
+            return;
+        }
+
+        const { nodeId, columnIds } = columnSelection;
+        const removed = new Set(columnIds);
+
+        const table = nodesRef.current.find((node) => node.id === nodeId);
+
+        /**
+         * A table with no columns is refused when the diagram is saved, and an
+         * exported migration that creates nothing would fail on the way in. The
+         * table itself is what to delete at that point.
+         */
+        if (
+            table?.type === 'table' &&
+            table.data.columns.every((column) => removed.has(column.id))
+        ) {
+            toast.info(lastColumnNotice);
+
+            return;
+        }
+
+        setNodes((currentNodes) =>
+            currentNodes.map((node) =>
+                node.id === nodeId && node.type === 'table'
+                    ? {
+                          ...node,
+                          data: {
+                              ...node.data,
+                              columns: node.data.columns.filter(
+                                  (column) => !removed.has(column.id),
+                              ),
+                          },
+                      }
+                    : node,
+            ),
+        );
+
+        setEdges((currentEdges) =>
+            currentEdges.filter(
+                (edge) =>
+                    !removed.has(
+                        columnIdFromHandleId(edge.sourceHandle ?? ''),
+                    ) &&
+                    !removed.has(columnIdFromHandleId(edge.targetHandle ?? '')),
+            ),
+        );
+
+        clearSelection();
+    }, [clearSelection, columnSelection, setEdges, setNodes]);
+
+    /**
+     * Let go of picked columns once attention has moved elsewhere: their table
+     * is gone, or another table has been selected.
+     *
+     * While columns are picked the delete key belongs to them. Held past the
+     * moment it was meant, that key stops answering for anything else — and a
+     * selection the person has forgotten about is exactly when they reach for
+     * it to delete something they can see.
+     */
+    useEffect(() => {
+        if (columnSelection === null) {
+            return;
+        }
+
+        const holdingTable = nodes.find(
+            (node) => node.id === columnSelection.nodeId,
+        );
+        const anotherTableIsSelected = nodes.some(
+            (node) => node.selected && node.id !== columnSelection.nodeId,
+        );
+
+        if (holdingTable === undefined || anotherTableIsSelected) {
+            clearSelection();
+        }
+    }, [clearSelection, columnSelection, nodes]);
+
+    useDiagramShortcuts({
+        onUndo: undo,
+        onRedo: redo,
+        onSelectEverything: selectEverything,
+        onShowShortcuts: () => setIsShowingShortcuts(true),
+        onDeletePickedColumns: removeSelectedColumns,
+    });
 
     const onConnect = useCallback<OnConnect>(
         (connection) => {
@@ -225,6 +328,14 @@ function Canvas({
             edgeTypes={edgeTypes}
             defaultEdgeOptions={defaultEdgeOptions}
             connectionMode={ConnectionMode.Loose}
+            multiSelectionKeyCode={multiSelectionKeys}
+            /**
+             * With columns picked out, the delete key belongs to them. Left to
+             * React Flow it would take the whole table instead, which is a much
+             * larger thing to lose to one keystroke.
+             */
+            deleteKeyCode={columnSelection === null ? 'Backspace' : null}
+            onPaneClick={clearSelection}
             colorMode={resolvedAppearance}
             defaultViewport={initialDocument.viewport}
             panOnScroll
@@ -278,7 +389,9 @@ function Canvas({
 export default function DiagramCanvas(props: DiagramCanvasProps) {
     return (
         <ReactFlowProvider>
-            <Canvas {...props} />
+            <ColumnSelectionProvider>
+                <Canvas {...props} />
+            </ColumnSelectionProvider>
         </ReactFlowProvider>
     );
 }
