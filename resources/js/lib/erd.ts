@@ -366,6 +366,73 @@ export const maximumZoom = 2;
 export const lastColumnNotice =
     'A table needs at least one column. Delete the table itself instead.';
 
+/**
+ * How a match is marked, wherever it is shown.
+ *
+ * Amber is the colour every find-in-page uses, so it needs no explaining. It is
+ * also what a primary key badge uses, which is why the mark is on the text and
+ * the ring is around the table: two different shapes, never the same one twice.
+ */
+export const searchMatchTextStyles =
+    'rounded-xs bg-amber-200 text-neutral-900 dark:bg-amber-400/60 dark:text-neutral-950';
+
+export const searchMatchTableStyles = 'ring-2 ring-amber-400';
+
+/**
+ * Does this name answer to what is being searched for?
+ *
+ * Matching is loose on purpose: someone looking for a column types part of a
+ * name, in whatever case comes to hand, not a pattern.
+ */
+export function textMatchesSearch(text: string, term: string): boolean {
+    const wanted = term.trim().toLowerCase();
+
+    return wanted !== '' && text.toLowerCase().includes(wanted);
+}
+
+/**
+ * Cut a name into the parts that match what is being searched for and the parts
+ * that do not, so the matching parts can be marked where they are read.
+ */
+export function highlightSegments(
+    text: string,
+    term: string,
+): Array<{ text: string; isMatch: boolean }> {
+    const wanted = term.trim().toLowerCase();
+
+    if (wanted === '') {
+        return [{ text, isMatch: false }];
+    }
+
+    const segments: Array<{ text: string; isMatch: boolean }> = [];
+    const haystack = text.toLowerCase();
+    let readFrom = 0;
+    let found = haystack.indexOf(wanted);
+
+    while (found !== -1) {
+        if (found > readFrom) {
+            segments.push({
+                text: text.slice(readFrom, found),
+                isMatch: false,
+            });
+        }
+
+        segments.push({
+            text: text.slice(found, found + wanted.length),
+            isMatch: true,
+        });
+
+        readFrom = found + wanted.length;
+        found = haystack.indexOf(wanted, readFrom);
+    }
+
+    if (readFrom < text.length) {
+        segments.push({ text: text.slice(readFrom), isMatch: false });
+    }
+
+    return segments;
+}
+
 export const noColumnDefault: ColumnDefault = { kind: 'none' };
 
 /**

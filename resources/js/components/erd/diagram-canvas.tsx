@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import DiagramLegend from '@/components/erd/diagram-legend';
 import DiagramToolbar from '@/components/erd/diagram-toolbar';
 import RelationEdgeComponent from '@/components/erd/relation-edge';
+import SearchBox from '@/components/erd/search-box';
 import ShortcutsModal from '@/components/erd/shortcuts-modal';
 import StickyNoteNode from '@/components/erd/sticky-note-node';
 import TableNode from '@/components/erd/table-node';
@@ -28,6 +29,10 @@ import {
     useColumnSelection,
 } from '@/hooks/use-column-selection';
 import { useDiagramHistory } from '@/hooks/use-diagram-history';
+import {
+    DiagramSearchProvider,
+    useDiagramSearchActions,
+} from '@/hooks/use-diagram-search';
 import { useDiagramShortcuts } from '@/hooks/use-diagram-shortcuts';
 import {
     applyRelationToColumns,
@@ -103,6 +108,7 @@ function Canvas({
 }: DiagramCanvasProps) {
     const { resolvedAppearance } = useAppearance();
     const { selection: columnSelection, clearSelection } = useColumnSelection();
+    const { open: openSearch, close: closeSearch } = useDiagramSearchActions();
     const [isMinimapVisible, setIsMinimapVisible] = useState(true);
     const [isShowingShortcuts, setIsShowingShortcuts] = useState(false);
     const [isLegendVisible, setIsLegendVisible] = useState(true);
@@ -262,6 +268,8 @@ function Canvas({
         onSelectEverything: selectEverything,
         onShowShortcuts: () => setIsShowingShortcuts(true),
         onDeletePickedColumns: removeSelectedColumns,
+        onSearch: openSearch,
+        onDismiss: closeSearch,
     });
 
     const onConnect = useCallback<OnConnect>(
@@ -308,10 +316,19 @@ function Canvas({
         [setEdges, setNodes],
     );
 
+    /**
+     * A move nobody made by hand — stepping the view from one search match to
+     * the next — is remembered but not saved. Where someone last looked is
+     * worth keeping; a search is not an edit, and should not write to the
+     * server on its own.
+     */
     const onMoveEnd = useCallback(
-        (_event: unknown, viewport: Viewport) => {
+        (event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
             viewportRef.current = viewport;
-            reportDocument();
+
+            if (event !== null) {
+                reportDocument();
+            }
         },
         [reportDocument],
     );
@@ -361,6 +378,7 @@ function Canvas({
             )}
             <Controls />
             {isLegendVisible && <DiagramLegend />}
+            <SearchBox nodes={nodes} />
             <ShortcutsModal
                 open={isShowingShortcuts}
                 onOpenChange={setIsShowingShortcuts}
@@ -390,7 +408,9 @@ export default function DiagramCanvas(props: DiagramCanvasProps) {
     return (
         <ReactFlowProvider>
             <ColumnSelectionProvider>
-                <Canvas {...props} />
+                <DiagramSearchProvider>
+                    <Canvas {...props} />
+                </DiagramSearchProvider>
             </ColumnSelectionProvider>
         </ReactFlowProvider>
     );

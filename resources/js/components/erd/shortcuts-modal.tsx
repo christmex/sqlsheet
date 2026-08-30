@@ -26,6 +26,8 @@ const shortcutGroups = [
         title: 'Selecting',
         shortcuts: [
             ['Cmd / Ctrl + A', 'Select every table, note and relation'],
+            ['Cmd / Ctrl + F', 'Find a table or column by name'],
+            ['Enter, in the search box', 'Step to the next match'],
             ['Drag on empty canvas', 'Draw a selection box'],
             ['Shift + click a table header', 'Add that table to the selection'],
         ],

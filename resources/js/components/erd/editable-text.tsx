@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { highlightSegments, searchMatchTextStyles } from '@/lib/erd';
 import { cn } from '@/lib/utils';
 
 type EditableTextProps = {
@@ -7,6 +8,8 @@ type EditableTextProps = {
     label: string;
     className?: string;
     inputClassName?: string;
+    /** Part of the text to mark, as when the canvas is being searched. */
+    highlight?: string;
 };
 
 /**
@@ -22,6 +25,7 @@ export default function EditableText({
     label,
     className,
     inputClassName,
+    highlight = '',
 }: EditableTextProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [draft, setDraft] = useState(value);
@@ -57,7 +61,20 @@ export default function EditableText({
                 }}
                 title={label}
             >
-                {value}
+                {highlightSegments(value, highlight).map(
+                    (segment, position) => (
+                        <span
+                            key={`${position}-${segment.text}`}
+                            className={
+                                segment.isMatch
+                                    ? searchMatchTextStyles
+                                    : undefined
+                            }
+                        >
+                            {segment.text}
+                        </span>
+                    ),
+                )}
             </span>
         );
     }

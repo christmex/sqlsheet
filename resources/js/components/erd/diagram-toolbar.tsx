@@ -1,5 +1,13 @@
 import { Panel, useReactFlow } from '@xyflow/react';
-import { Info, Keyboard, Layers, Map, Plus, Waypoints } from 'lucide-react';
+import {
+    Info,
+    Keyboard,
+    Layers,
+    Map,
+    Plus,
+    Search,
+    Waypoints,
+} from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import ExportImageMenu from '@/components/erd/export-image-menu';
@@ -12,6 +20,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useDiagramSearchActions } from '@/hooks/use-diagram-search';
 import {
     createStickyNoteNode,
     createTableNode,
@@ -43,6 +52,7 @@ export default function DiagramToolbar({
     onToggleMinimap,
 }: DiagramToolbarProps) {
     const [isFindingRelations, setIsFindingRelations] = useState(false);
+    const { open: openSearch } = useDiagramSearchActions();
     const { addNodes, addEdges, getEdges, getNodes, screenToFlowPosition } =
         useReactFlow<DiagramNode, RelationEdge>();
 
@@ -211,6 +221,15 @@ export default function DiagramToolbar({
                     data-test="find-relations"
                 >
                     <Waypoints /> Find relations
+                </Button>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Find a table or column (Cmd / Ctrl + F)"
+                    onClick={openSearch}
+                    data-test="open-search"
+                >
+                    <Search />
                 </Button>
                 <ExportImageMenu diagramName={diagramName} />
                 <ThemeMenu />

@@ -12,11 +12,14 @@ import ColumnEditor from '@/components/erd/column-editor';
 import EditableText from '@/components/erd/editable-text';
 import { useColumnReorder } from '@/hooks/use-column-reorder';
 import { useColumnSelection } from '@/hooks/use-column-selection';
+import { useDiagramSearchState } from '@/hooks/use-diagram-search';
 import {
     columnHandleId,
     columnKeyLabels,
     columnIdFromHandleId,
     lastColumnNotice,
+    searchMatchTableStyles,
+    textMatchesSearch,
     createTableColumn,
 } from '@/lib/erd';
 import { cn } from '@/lib/utils';
@@ -54,6 +57,20 @@ function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
     const updateNodeInternals = useUpdateNodeInternals();
     const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
     const { isSelected, selectColumn } = useColumnSelection();
+    const { term: searchTerm } = useDiagramSearchState();
+
+    const holdsWhatIsSearchedFor =
+        textMatchesSearch(data.name, searchTerm) ||
+        data.columns.some((column) =>
+            textMatchesSearch(column.name, searchTerm),
+        );
+
+    /**
+     * While a search is running, a table holding nothing of it steps back
+     * rather than disappearing: what is around a match is how you tell whether
+     * it is the one you wanted.
+     */
+    const isSetAside = searchTerm.trim() !== '' && !holdsWhatIsSearchedFor;
 
     const replaceColumns = useCallback(
         (columns: TableColumn[]) => {
@@ -144,8 +161,10 @@ function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
     return (
         <div
             className={cn(
-                'group/table w-72 rounded-lg border border-neutral-200 bg-white shadow-sm transition-shadow dark:border-neutral-800 dark:bg-neutral-900',
+                'group/table w-72 rounded-lg border border-neutral-200 bg-white shadow-sm transition-all dark:border-neutral-800 dark:bg-neutral-900',
                 selected && 'shadow-lg ring-2 ring-neutral-900 dark:ring-white',
+                isSetAside && 'opacity-25',
+                holdsWhatIsSearchedFor && searchMatchTableStyles,
             )}
         >
             <div
@@ -154,6 +173,7 @@ function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
             >
                 <EditableText
                     value={data.name}
+                    highlight={searchTerm}
                     label="Table name"
                     className="block truncate text-sm font-semibold text-white"
                     inputClassName="text-sm font-semibold text-neutral-900 dark:text-neutral-100"
@@ -296,6 +316,7 @@ function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
 
                             <EditableText
                                 value={column.name}
+                                highlight={searchTerm}
                                 label="Column name"
                                 className="min-w-0 flex-1 truncate text-xs text-neutral-800 dark:text-neutral-100"
                                 inputClassName="text-xs"

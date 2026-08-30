@@ -6,6 +6,8 @@ type UseDiagramShortcutsOptions = {
     onSelectEverything: () => void;
     onShowShortcuts: () => void;
     onDeletePickedColumns: () => void;
+    onSearch: () => void;
+    onDismiss: () => void;
 };
 
 /**
@@ -51,10 +53,18 @@ export function useDiagramShortcuts({
     onSelectEverything,
     onShowShortcuts,
     onDeletePickedColumns,
+    onSearch,
+    onDismiss,
 }: UseDiagramShortcutsOptions) {
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (isTyping(event.target) || isDialogOpen()) {
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                onDismiss();
+
                 return;
             }
 
@@ -94,6 +104,13 @@ export function useDiagramShortcuts({
             if (key === 'a') {
                 event.preventDefault();
                 onSelectEverything();
+
+                return;
+            }
+
+            if (key === 'f') {
+                event.preventDefault();
+                onSearch();
             }
         };
 
@@ -102,7 +119,9 @@ export function useDiagramShortcuts({
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [
         onDeletePickedColumns,
+        onDismiss,
         onRedo,
+        onSearch,
         onSelectEverything,
         onShowShortcuts,
         onUndo,
