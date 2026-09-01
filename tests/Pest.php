@@ -1,6 +1,10 @@
 <?php
 
+use App\Actions\Diagrams\GenerateDiagramMigrations;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /*
@@ -44,7 +48,25 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Write the generated migrations to a throwaway directory and run them.
+ *
+ * String matching only proves the generator wrote what was expected; running the
+ * files is the only thing that proves Laravel accepts them.
+ *
+ * @param  array<string, mixed>  $document
+ */
+function runGeneratedMigrations(array $document): string
 {
-    // ..
+    $directory = storage_path('framework/testing/generated-migrations-'.Str::random(8));
+
+    File::ensureDirectoryExists($directory);
+
+    foreach ((new GenerateDiagramMigrations)->handle($document, CarbonImmutable::parse('2026-03-01 09:00:00')) as $filename => $contents) {
+        File::put($directory.'/'.$filename, $contents);
+    }
+
+    test()->artisan('migrate', ['--path' => $directory, '--realpath' => true])->assertSuccessful();
+
+    return $directory;
 }

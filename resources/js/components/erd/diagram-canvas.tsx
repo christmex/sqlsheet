@@ -13,7 +13,7 @@ import {
 } from '@xyflow/react';
 import type { DefaultEdgeOptions, OnConnect, Viewport } from '@xyflow/react';
 import { nanoid } from 'nanoid';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import DiagramLegend from '@/components/erd/diagram-legend';
@@ -34,6 +34,10 @@ import {
     useDiagramSearchActions,
 } from '@/hooks/use-diagram-search';
 import { useDiagramShortcuts } from '@/hooks/use-diagram-shortcuts';
+import {
+    RelationSpotlightProvider,
+    spotlightFromEdges,
+} from '@/hooks/use-relation-spotlight';
 import {
     applyRelationToColumns,
     columnIdFromHandleId,
@@ -95,6 +99,8 @@ type DiagramCanvasProps = {
     diagramName: string;
     initialDocument: DiagramDocument;
     tablePresets: TablePreset[];
+    teamSlug: string;
+    diagramId: number;
     onDocumentChange?: (nextDocument: DiagramDocument) => void;
     children?: ReactNode;
 };
@@ -103,6 +109,8 @@ function Canvas({
     diagramName,
     initialDocument,
     tablePresets,
+    teamSlug,
+    diagramId,
     onDocumentChange,
     children,
 }: DiagramCanvasProps) {
@@ -262,6 +270,27 @@ function Canvas({
         }
     }, [clearSelection, columnSelection, nodes]);
 
+    /**
+     * One key that says "never mind": it closes the search, lets go of picked
+     * columns, and puts out the relation spotlight. Anything that dims or marks
+     * the diagram has the same way out, so nothing can be left switched on with
+     * no obvious way to switch it off.
+     */
+    const dismissEverything = useCallback(() => {
+        closeSearch();
+        clearSelection();
+        setNodes((currentNodes) =>
+            currentNodes.map((node) =>
+                node.selected ? { ...node, selected: false } : node,
+            ),
+        );
+        setEdges((currentEdges) =>
+            currentEdges.map((edge) =>
+                edge.selected ? { ...edge, selected: false } : edge,
+            ),
+        );
+    }, [clearSelection, closeSearch, setEdges, setNodes]);
+
     useDiagramShortcuts({
         onUndo: undo,
         onRedo: redo,
@@ -269,8 +298,14 @@ function Canvas({
         onShowShortcuts: () => setIsShowingShortcuts(true),
         onDeletePickedColumns: removeSelectedColumns,
         onSearch: openSearch,
-        onDismiss: closeSearch,
+        onDismiss: dismissEverything,
     });
+
+    /**
+     * Which tables the picked relations join. Worked out here, where the edges
+     * live, and read by every table.
+     */
+    const spotlight = useMemo(() => spotlightFromEdges(edges), [edges]);
 
     const onConnect = useCallback<OnConnect>(
         (connection) => {
@@ -334,68 +369,87 @@ function Canvas({
     );
 
     return (
-        <ReactFlow<DiagramNode, RelationEdge>
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onMoveEnd={onMoveEnd}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            defaultEdgeOptions={defaultEdgeOptions}
-            connectionMode={ConnectionMode.Loose}
-            multiSelectionKeyCode={multiSelectionKeys}
-            /**
-             * With columns picked out, the delete key belongs to them. Left to
-             * React Flow it would take the whole table instead, which is a much
-             * larger thing to lose to one keystroke.
-             */
-            deleteKeyCode={columnSelection === null ? 'Backspace' : null}
-            onPaneClick={clearSelection}
-            colorMode={resolvedAppearance}
-            defaultViewport={initialDocument.viewport}
-            panOnScroll
-            zoomOnScroll={false}
-            selectionOnDrag
-            panOnDrag={[1, 2]}
-            snapToGrid
-            snapGrid={[16, 16]}
-            minZoom={minimumZoom}
-            maxZoom={maximumZoom}
-        >
-            <Background variant={BackgroundVariant.Dots} gap={16} size={1.5} />
-            {isMinimapVisible && (
-                <MiniMap<DiagramNode>
-                    pannable
-                    zoomable
-                    nodeColor={(node) =>
-                        node.type === 'stickyNote'
-                            ? node.data.color
-                            : node.data.headerColor
+        <RelationSpotlightProvider spotlight={spotlight}>
+            <ReactFlow<DiagramNode, RelationEdge>
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onMoveEnd={onMoveEnd}
+                nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
+                defaultEdgeOptions={defaultEdgeOptions}
+                /**
+                 * Only draw what is on screen.
+                 *
+                 * Every column is a row and every row carries two connection points,
+                 * so a sixty-table diagram puts thousands of them in the page at
+                 * once and every pan repaints the lot. Off-screen tables keep their
+                 * measurements, so relations to them still land in the right place.
+                 */
+                onlyRenderVisibleElements
+                connectionMode={ConnectionMode.Loose}
+                multiSelectionKeyCode={multiSelectionKeys}
+                /**
+                 * With columns picked out, the delete key belongs to them. Left to
+                 * React Flow it would take the whole table instead, which is a much
+                 * larger thing to lose to one keystroke.
+                 */
+                deleteKeyCode={columnSelection === null ? 'Backspace' : null}
+                onPaneClick={clearSelection}
+                colorMode={resolvedAppearance}
+                defaultViewport={initialDocument.viewport}
+                panOnScroll
+                zoomOnScroll={false}
+                selectionOnDrag
+                panOnDrag={[1, 2]}
+                snapToGrid
+                snapGrid={[16, 16]}
+                minZoom={minimumZoom}
+                maxZoom={maximumZoom}
+            >
+                <Background
+                    variant={BackgroundVariant.Dots}
+                    gap={16}
+                    size={1.5}
+                />
+                {isMinimapVisible && (
+                    <MiniMap<DiagramNode>
+                        pannable
+                        zoomable
+                        nodeColor={(node) =>
+                            node.type === 'stickyNote'
+                                ? node.data.color
+                                : node.data.headerColor
+                        }
+                    />
+                )}
+                <Controls />
+                {isLegendVisible && <DiagramLegend />}
+                <SearchBox nodes={nodes} />
+                <ShortcutsModal
+                    open={isShowingShortcuts}
+                    onOpenChange={setIsShowingShortcuts}
+                />
+                <DiagramToolbar
+                    diagramName={diagramName}
+                    tablePresets={tablePresets}
+                    teamSlug={teamSlug}
+                    diagramId={diagramId}
+                    onShowShortcuts={() => setIsShowingShortcuts(true)}
+                    isLegendVisible={isLegendVisible}
+                    onToggleLegend={() =>
+                        setIsLegendVisible((visible) => !visible)
+                    }
+                    isMinimapVisible={isMinimapVisible}
+                    onToggleMinimap={() =>
+                        setIsMinimapVisible((visible) => !visible)
                     }
                 />
-            )}
-            <Controls />
-            {isLegendVisible && <DiagramLegend />}
-            <SearchBox nodes={nodes} />
-            <ShortcutsModal
-                open={isShowingShortcuts}
-                onOpenChange={setIsShowingShortcuts}
-            />
-            <DiagramToolbar
-                diagramName={diagramName}
-                tablePresets={tablePresets}
-                onShowShortcuts={() => setIsShowingShortcuts(true)}
-                isLegendVisible={isLegendVisible}
-                onToggleLegend={() => setIsLegendVisible((visible) => !visible)}
-                isMinimapVisible={isMinimapVisible}
-                onToggleMinimap={() =>
-                    setIsMinimapVisible((visible) => !visible)
-                }
-            />
-            {children}
-        </ReactFlow>
+                {children}
+            </ReactFlow>
+        </RelationSpotlightProvider>
     );
 }
 

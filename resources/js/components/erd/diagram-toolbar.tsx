@@ -4,6 +4,8 @@ import {
     Keyboard,
     Layers,
     Map,
+    FileCode,
+    LayoutGrid,
     Plus,
     Search,
     Waypoints,
@@ -12,6 +14,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import ExportImageMenu from '@/components/erd/export-image-menu';
 import FindRelationsModal from '@/components/erd/find-relations-modal';
+import ImportSqlModal from '@/components/erd/import-sql-modal';
 import ThemeMenu from '@/components/erd/theme-menu';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useDiagramSearchActions } from '@/hooks/use-diagram-search';
 import {
+    arrangeTables,
     createStickyNoteNode,
     createTableNode,
     maximumNodesPerDiagram,
@@ -35,6 +39,8 @@ import type { DiagramNode, RelationEdge, TablePreset } from '@/types';
 type DiagramToolbarProps = {
     diagramName: string;
     tablePresets: TablePreset[];
+    teamSlug: string;
+    diagramId: number;
     onShowShortcuts: () => void;
     isLegendVisible: boolean;
     onToggleLegend: () => void;
@@ -45,6 +51,8 @@ type DiagramToolbarProps = {
 export default function DiagramToolbar({
     diagramName,
     tablePresets,
+    teamSlug,
+    diagramId,
     onShowShortcuts,
     isLegendVisible,
     onToggleLegend,
@@ -52,9 +60,17 @@ export default function DiagramToolbar({
     onToggleMinimap,
 }: DiagramToolbarProps) {
     const [isFindingRelations, setIsFindingRelations] = useState(false);
+    const [isImportingSql, setIsImportingSql] = useState(false);
     const { open: openSearch } = useDiagramSearchActions();
-    const { addNodes, addEdges, getEdges, getNodes, screenToFlowPosition } =
-        useReactFlow<DiagramNode, RelationEdge>();
+    const {
+        addNodes,
+        addEdges,
+        fitView,
+        getEdges,
+        getNodes,
+        screenToFlowPosition,
+        setNodes,
+    } = useReactFlow<DiagramNode, RelationEdge>();
 
     /**
      * Lay new nodes out in a loose grid starting from what the user is looking at.
@@ -161,6 +177,57 @@ export default function DiagramToolbar({
         [addEdges, addNodes, getEdges, getNodes, nextNodePosition],
     );
 
+    /**
+     * Start the tidied diagram where the tables already are, so a diagram that
+     * was somewhere on the canvas does not jump to the middle of nowhere.
+     */
+    const tidyStartPosition = (tables: DiagramNode[]) => ({
+        x: Math.min(...tables.map((table) => table.position.x)),
+        y: Math.min(...tables.map((table) => table.position.y)),
+    });
+
+    /**
+     * Lay every table out again from what it holds and what it points at.
+     *
+     * A diagram grown table by table, or read out of a large schema, ends up
+     * with tables anywhere. This puts them back in order without touching what
+     * any of them says, and one Ctrl+Z takes it back.
+     */
+    const tidyUp = useCallback(() => {
+        const tables = getNodes().filter((node) => node.type === 'table');
+
+        if (tables.length === 0) {
+            toast.info('There are no tables to tidy up yet.');
+
+            return;
+        }
+
+        const tableIds = new Set(tables.map((table) => table.id));
+        const placements = arrangeTables(
+            tables.map((table) => ({
+                id: table.id,
+                columnCount:
+                    table.type === 'table' ? table.data.columns.length : 0,
+            })),
+            getEdges()
+                .filter(
+                    (edge) =>
+                        tableIds.has(edge.source) && tableIds.has(edge.target),
+                )
+                .map((edge): [string, string] => [edge.source, edge.target]),
+            tidyStartPosition(tables),
+        );
+
+        setNodes((currentNodes) =>
+            currentNodes.map((node) => ({
+                ...node,
+                position: placements[node.id] ?? node.position,
+            })),
+        );
+
+        window.requestAnimationFrame(() => fitView({ duration: 400 }));
+    }, [fitView, getEdges, getNodes, setNodes]);
+
     const addStickyNote = useCallback(() => {
         addNodes(createStickyNoteNode(nextNodePosition(getNodes().length)));
     }, [addNodes, getNodes, nextNodePosition]);
@@ -225,6 +292,23 @@ export default function DiagramToolbar({
                 <Button
                     size="sm"
                     variant="ghost"
+                    title="Lay the tables out again"
+                    onClick={tidyUp}
+                    data-test="tidy-up"
+                >
+                    <LayoutGrid /> Tidy up
+                </Button>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setIsImportingSql(true)}
+                    data-test="open-sql-import"
+                >
+                    <FileCode /> Import SQL
+                </Button>
+                <Button
+                    size="sm"
+                    variant="ghost"
                     title="Find a table or column (Cmd / Ctrl + F)"
                     onClick={openSearch}
                     data-test="open-search"
@@ -281,6 +365,14 @@ export default function DiagramToolbar({
             <FindRelationsModal
                 open={isFindingRelations}
                 onOpenChange={setIsFindingRelations}
+            />
+
+            <ImportSqlModal
+                open={isImportingSql}
+                onOpenChange={setIsImportingSql}
+                teamSlug={teamSlug}
+                diagramId={diagramId}
+                onRead={addPreset}
             />
         </Panel>
     );

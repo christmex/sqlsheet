@@ -46,10 +46,10 @@ test('users can authenticate using the login screen', function () {
     ]);
 
     $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard'));
+    $response->assertRedirect(route('diagrams.index'));
 });
 
-test('passkey login response redirects to the current team dashboard', function () {
+test('passkey login response redirects to the diagrams of the current team', function () {
     $user = User::factory()->create();
 
     $request = Request::create(route('login', absolute: false), 'GET', server: [
@@ -60,7 +60,7 @@ test('passkey login response redirects to the current team dashboard', function 
 
     $jsonResponse = app(PasskeyLoginResponse::class)->toResponse($request);
 
-    expect($jsonResponse->getData()->redirect)->toBe(route('dashboard', ['current_team' => $user->personalTeam()->slug]));
+    expect($jsonResponse->getData()->redirect)->toBe(route('diagrams.index', ['current_team' => $user->personalTeam()->slug]));
 });
 
 test('users with two factor enabled are redirected to two factor challenge', function () {

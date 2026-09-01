@@ -100,6 +100,18 @@ export default function DiagramShow({
     );
     const autosaveTimerRef = useRef<number | null>(null);
     const isAutosavePausedRef = useRef(false);
+
+    /**
+     * One save at a time.
+     *
+     * A save carries the version it is built on, and the answer carries the next
+     * one. Two saves in the air at once therefore both carry the same version,
+     * and the second is refused as though someone else had edited the diagram —
+     * which nobody had. Anything that happens while a save is running waits for
+     * it and goes out afterwards, with the version it came back with.
+     */
+    const isSavingRef = useRef(false);
+    const hasMoreToSaveRef = useRef(false);
     const updateUrlRef = useRef(updateUrl);
 
     const [saveProblem, setSaveProblem] = useState<SaveProblem | null>(null);
@@ -127,59 +139,85 @@ export default function DiagramShow({
         setSaveProblem(problem);
     }, []);
 
-    const sendDocument = useCallback(() => {
-        const documentToSave = canonicalDocumentJson(documentRef.current);
+    /**
+     * Named so the save that has just finished can start the next one itself,
+     * without a ref standing between it and its own name.
+     */
+    const sendDocument = useCallback(
+        function saveNow() {
+            const documentToSave = canonicalDocumentJson(documentRef.current);
 
-        if (documentToSave === lastSavedDocumentRef.current) {
-            return;
-        }
+            if (documentToSave === lastSavedDocumentRef.current) {
+                return;
+            }
 
-        const currentSave = saveRef.current;
+            if (isSavingRef.current) {
+                hasMoreToSaveRef.current = true;
 
-        currentSave.transform(() => ({
-            version: versionRef.current,
-            document: documentRef.current,
-        }));
+                return;
+            }
 
-        currentSave
-            .patch(updateUrlRef.current, {
-                onSuccess: (response) => {
-                    versionRef.current = response.version;
-                    lastSavedDocumentRef.current = documentToSave;
-                    setLastSavedAt(new Date());
-                    setSaveProblem(null);
-                },
-                /**
-                 * A rejected document (422) is delivered here and nowhere else —
-                 * `onHttpException` is never called for that status.
-                 */
-                onError: (errors) => {
-                    setSaveProblem(
-                        invalidDocumentProblem(
-                            Object.values(errors)[0] ??
-                                'The server would not accept this diagram.',
-                        ),
-                    );
-                },
-                /**
-                 * Every other refusal arrives here. Returning false keeps Inertia
-                 * from stacking a global error dialog on top of the canvas.
-                 */
-                onHttpException: (response) => {
-                    pauseAutosave(
-                        {
-                            [conflictStatus]: conflictProblem,
-                            [goneStatus]: deletedProblem,
-                        }[response.status] ?? refusedProblem,
-                    );
+            isSavingRef.current = true;
 
-                    return false;
-                },
-            })
-            // The refusal is already handled above; without this the rejected
-            // promise surfaces as an unhandled error in the console.
-            .catch(() => undefined);
-    }, [pauseAutosave]);
+            const currentSave = saveRef.current;
+
+            currentSave.transform(() => ({
+                version: versionRef.current,
+                document: documentRef.current,
+            }));
+
+            currentSave
+                .patch(updateUrlRef.current, {
+                    onSuccess: (response) => {
+                        versionRef.current = response.version;
+                        lastSavedDocumentRef.current = documentToSave;
+                        setLastSavedAt(new Date());
+                        setSaveProblem(null);
+                    },
+                    /**
+                     * A rejected document (422) is delivered here and nowhere else —
+                     * `onHttpException` is never called for that status.
+                     */
+                    onError: (errors) => {
+                        setSaveProblem(
+                            invalidDocumentProblem(
+                                Object.values(errors)[0] ??
+                                    'The server would not accept this diagram.',
+                            ),
+                        );
+                    },
+                    /**
+                     * Every other refusal arrives here. Returning false keeps Inertia
+                     * from stacking a global error dialog on top of the canvas.
+                     */
+                    onHttpException: (response) => {
+                        pauseAutosave(
+                            {
+                                [conflictStatus]: conflictProblem,
+                                [goneStatus]: deletedProblem,
+                            }[response.status] ?? refusedProblem,
+                        );
+
+                        return false;
+                    },
+                })
+                // The refusal is already handled above; without this the rejected
+                // promise surfaces as an unhandled error in the console.
+                .catch(() => undefined)
+                .finally(() => {
+                    isSavingRef.current = false;
+
+                    if (
+                        hasMoreToSaveRef.current &&
+                        !isAutosavePausedRef.current
+                    ) {
+                        hasMoreToSaveRef.current = false;
+                        saveNow();
+                    }
+                });
+        },
+        [pauseAutosave],
+    );
 
     const scheduleSave = useCallback(
         (nextDocument: DiagramDocument) => {
@@ -222,6 +260,8 @@ export default function DiagramShow({
                     diagramName={diagram.name}
                     initialDocument={diagram.document}
                     tablePresets={tablePresets}
+                    teamSlug={teamSlug}
+                    diagramId={diagram.id}
                     onDocumentChange={scheduleSave}
                 >
                     <Panel position="top-left">
@@ -294,7 +334,7 @@ export default function DiagramShow({
                     </Panel>
 
                     {saveProblem && (
-                        <Panel position="top-center">
+                        <Panel position="top-center" className="mt-16!">
                             <div
                                 className="max-w-sm rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm shadow-sm dark:border-amber-500/40 dark:bg-amber-950"
                                 data-test="conflict-banner"

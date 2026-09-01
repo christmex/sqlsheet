@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Diagrams\SaveDiagramRequest;
 use App\Http\Requests\Diagrams\UpdateDiagramDocumentRequest;
 use App\Models\Diagram;
+use App\Models\TeamInvitation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,16 +23,20 @@ class DiagramController extends Controller
     {
         $diagrams = $request->user()->currentTeam
             ->diagrams()
+            ->withExists(['starredBy as is_starred' => fn ($query) => $query->whereKey($request->user())])
             ->latest('updated_at')
             ->get()
             ->map(fn (Diagram $diagram) => [
                 'id' => $diagram->id,
                 'name' => $diagram->name,
                 'updatedAt' => $diagram->updated_at?->toISOString(),
+                'isStarred' => (bool) $diagram->is_starred,
+                ...$diagram->contents(),
             ]);
 
         return Inertia::render('diagrams/index', [
             'diagrams' => $diagrams,
+            'pendingInvitations' => TeamInvitation::waitingFor($request->user()),
         ]);
     }
 

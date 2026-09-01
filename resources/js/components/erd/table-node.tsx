@@ -13,12 +13,15 @@ import EditableText from '@/components/erd/editable-text';
 import { useColumnReorder } from '@/hooks/use-column-reorder';
 import { useColumnSelection } from '@/hooks/use-column-selection';
 import { useDiagramSearchState } from '@/hooks/use-diagram-search';
+import { useRelationSpotlight } from '@/hooks/use-relation-spotlight';
 import {
     columnHandleId,
     columnKeyLabels,
     columnIdFromHandleId,
     lastColumnNotice,
     searchMatchTableStyles,
+    spotlitColumnStyles,
+    spotlitTableStyles,
     textMatchesSearch,
     createTableColumn,
 } from '@/lib/erd';
@@ -65,12 +68,16 @@ function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
             textMatchesSearch(column.name, searchTerm),
         );
 
+    const spotlight = useRelationSpotlight();
+    const isSpotlit = spotlight?.nodeIds.has(id) ?? false;
+
     /**
-     * While a search is running, a table holding nothing of it steps back
-     * rather than disappearing: what is around a match is how you tell whether
-     * it is the one you wanted.
+     * A table nothing is asking about steps back rather than disappearing: what
+     * is around the answer is how you tell whether it is the one you wanted.
      */
-    const isSetAside = searchTerm.trim() !== '' && !holdsWhatIsSearchedFor;
+    const isSetAside =
+        (searchTerm.trim() !== '' && !holdsWhatIsSearchedFor) ||
+        (spotlight !== null && !isSpotlit);
 
     const replaceColumns = useCallback(
         (columns: TableColumn[]) => {
@@ -165,6 +172,7 @@ function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
                 selected && 'shadow-lg ring-2 ring-neutral-900 dark:ring-white',
                 isSetAside && 'opacity-25',
                 holdsWhatIsSearchedFor && searchMatchTableStyles,
+                isSpotlit && spotlitTableStyles,
             )}
         >
             <div
@@ -197,6 +205,8 @@ function TableNode({ id, data, selected }: NodeProps<TableNodeType>) {
                                 'group/row relative flex items-center gap-2 px-3 py-1.5',
                                 isPickedOut &&
                                     'bg-sky-50/80 dark:bg-sky-400/10',
+                                spotlight?.columnIds.has(column.id) &&
+                                    spotlitColumnStyles,
                                 isBeingCarried
                                     ? 'z-10 rounded-md bg-white shadow-lg ring-1 ring-neutral-300 dark:bg-neutral-900 dark:ring-neutral-600'
                                     : isDragging &&

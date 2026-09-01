@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -41,6 +42,38 @@ class Diagram extends Model
             'edges' => [],
             'viewport' => ['x' => 0, 'y' => 0, 'zoom' => 1],
         ];
+    }
+
+    /**
+     * The people who keep this diagram on their own shortlist.
+     *
+     * @return BelongsToMany<User, $this>
+     */
+    public function starredBy(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'diagram_stars')->withTimestamps();
+    }
+
+    /**
+     * How many tables and relations this diagram holds.
+     *
+     * Read from the stored document rather than counted anywhere else: the
+     * document is the only place either of them exists.
+     *
+     * @return array{tables: int, relations: int}
+     */
+    public function contents(): array
+    {
+        $nodes = is_array($this->document['nodes'] ?? null) ? $this->document['nodes'] : [];
+        $edges = is_array($this->document['edges'] ?? null) ? $this->document['edges'] : [];
+
+        $tables = array_filter(
+            $nodes,
+            fn (mixed $node): bool => is_array($node)
+                && ($node['type'] ?? null) === DiagramNodeType::Table->value,
+        );
+
+        return ['tables' => count($tables), 'relations' => count($edges)];
     }
 
     /**

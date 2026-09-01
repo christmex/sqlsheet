@@ -363,8 +363,26 @@ export const maximumZoom = 2;
  * columns is refused when the diagram is saved, and an exported migration that
  * creates nothing would fail on the way in.
  */
+/**
+ * The most SQL one import may carry, matching ImportSqlRequest::MAXIMUM_LENGTH.
+ *
+ * Checked before a file is read so an oversized dump is refused with something
+ * useful to do about it, rather than by the server after the wait.
+ */
+export const maximumSqlLength = 524288;
+
 export const lastColumnNotice =
     'A table needs at least one column. Delete the table itself instead.';
+
+/**
+ * How the two ends of a picked relation are lit.
+ *
+ * Green, because amber already means "found by a search" and sky already means
+ * "picked out by hand": three different questions, three different colours.
+ */
+export const spotlitTableStyles = 'ring-2 ring-emerald-400';
+
+export const spotlitColumnStyles = 'bg-emerald-100/70 dark:bg-emerald-400/15';
 
 /**
  * How a match is marked, wherever it is shown.
@@ -777,15 +795,8 @@ export function nodesFromPreset(
         nodes.push({
             id: `tbl_${nanoid()}`,
             type: 'table',
-            position: {
-                x:
-                    startPosition.x +
-                    (placed % newNodesPerRow) * newNodeColumnWidthInPixels,
-                y:
-                    startPosition.y +
-                    Math.floor(placed / newNodesPerRow) *
-                        newNodeRowHeightInPixels,
-            },
+            // Given a place below, once every table's size is known.
+            position: startPosition,
             data: {
                 name: table.name,
                 headerColor:
@@ -867,7 +878,32 @@ export function nodesFromPreset(
         });
     });
 
-    return { nodes, edges, skippedTableNames };
+    /**
+     * Now that every table's size and every relation is known, the tables can be
+     * laid out: kept in groups that point at each other, and spread across
+     * columns rather than run off the bottom of the canvas.
+     */
+    const placements = arrangeTables(
+        nodes.map((node) => ({
+            id: node.id,
+            columnCount: node.data.columns.length,
+        })),
+        edges
+            .filter(
+                (edge) =>
+                    nodes.some((node) => node.id === edge.source) &&
+                    nodes.some((node) => node.id === edge.target),
+            )
+            .map((edge): [string, string] => [edge.source, edge.target]),
+        startPosition,
+    );
+
+    const placedNodes = nodes.map((node) => ({
+        ...node,
+        position: placements[node.id] ?? node.position,
+    }));
+
+    return { nodes: placedNodes, edges, skippedTableNames };
 }
 
 /**
@@ -879,6 +915,139 @@ export function nodesFromPreset(
 export const newNodesPerRow = 3;
 export const newNodeColumnWidthInPixels = 340;
 export const newNodeRowHeightInPixels = 260;
+
+/**
+ * What a table takes up on the canvas, measured from what it holds.
+ *
+ * A table's height is its rows, so laying tables out on a fixed grid stacks a
+ * three-column table and a thirty-column one in the same slot: one leaves a
+ * hole, the other runs into its neighbour.
+ */
+const tableHeaderHeightInPixels = 40;
+const tableRowHeightInPixels = 29;
+const tableFooterHeightInPixels = 30;
+const gapBetweenTablesInPixels = 48;
+
+function tableHeightInPixels(columnCount: number): number {
+    return (
+        tableHeaderHeightInPixels +
+        columnCount * tableRowHeightInPixels +
+        tableFooterHeightInPixels
+    );
+}
+
+/**
+ * One table waiting to be given a place.
+ */
+type TableToPlace = {
+    id: string;
+    columnCount: number;
+};
+
+/**
+ * Work out where a set of tables should sit.
+ *
+ * Tables that point at each other are placed next to each other, and that order
+ * is then poured into columns of roughly equal height. Keeping a whole group in
+ * one column looks tidy until the schema is well connected — where everything
+ * reaches `users` sooner or later, one group holds every table and one column
+ * becomes a mile-long ribbon.
+ *
+ * @param relatedPairs table ids that are joined by a relation
+ */
+export function arrangeTables(
+    tables: TableToPlace[],
+    relatedPairs: Array<[string, string]>,
+    startPosition: XYPosition,
+): Record<string, XYPosition> {
+    const ordered = groupsOfRelatedTables(tables, relatedPairs).flat();
+
+    /**
+     * A canvas wider than it is tall reads better on a screen, so the number of
+     * columns grows with the square root of what has to fit.
+     */
+    const columnCount = Math.max(
+        1,
+        Math.min(8, Math.ceil(Math.sqrt(ordered.length))),
+    );
+
+    const heights = ordered.map(
+        (table) =>
+            tableHeightInPixels(table.columnCount) + gapBetweenTablesInPixels,
+    );
+    const targetHeight =
+        heights.reduce((total, height) => total + height, 0) / columnCount;
+
+    const positions: Record<string, XYPosition> = {};
+    let column = 0;
+    let bottom = 0;
+
+    ordered.forEach((table, index) => {
+        /**
+         * Move on once this column has had its share — but never leave a column
+         * empty, and never spill past the last one.
+         */
+        if (bottom > 0 && bottom >= targetHeight && column < columnCount - 1) {
+            column += 1;
+            bottom = 0;
+        }
+
+        positions[table.id] = {
+            x: startPosition.x + column * newNodeColumnWidthInPixels,
+            y: startPosition.y + bottom,
+        };
+
+        bottom += heights[index];
+    });
+
+    return positions;
+}
+
+/**
+ * Gather tables into the groups that point at one another, largest first.
+ *
+ * The groups decide what order tables are placed in, so what belongs together
+ * ends up together: near each other in a column, or at worst at the foot of one
+ * column and the head of the next.
+ */
+function groupsOfRelatedTables(
+    tables: TableToPlace[],
+    relatedPairs: Array<[string, string]>,
+): TableToPlace[][] {
+    const groupOf = new Map<string, string>(
+        tables.map((table) => [table.id, table.id]),
+    );
+
+    const leaderOf = (id: string): string => {
+        let leader = groupOf.get(id) ?? id;
+
+        while (leader !== groupOf.get(leader)) {
+            leader = groupOf.get(leader) ?? leader;
+        }
+
+        return leader;
+    };
+
+    relatedPairs.forEach(([one, other]) => {
+        if (!groupOf.has(one) || !groupOf.has(other)) {
+            return;
+        }
+
+        groupOf.set(leaderOf(one), leaderOf(other));
+    });
+
+    const grouped = new Map<string, TableToPlace[]>();
+
+    tables.forEach((table) => {
+        const leader = leaderOf(table.id);
+
+        grouped.set(leader, [...(grouped.get(leader) ?? []), table]);
+    });
+
+    return [...grouped.values()].sort(
+        (one, other) => other.length - one.length,
+    );
+}
 
 /**
  * The most nodes one diagram may hold.

@@ -27,6 +27,8 @@ const shortcutGroups = [
         shortcuts: [
             ['Cmd / Ctrl + A', 'Select every table, note and relation'],
             ['Cmd / Ctrl + F', 'Find a table or column by name'],
+            ['Click a relation', 'Light up the two tables it joins'],
+            ['Escape', 'Let go of whatever is picked out or lit'],
             ['Enter, in the search box', 'Step to the next match'],
             ['Drag on empty canvas', 'Draw a selection box'],
             ['Shift + click a table header', 'Add that table to the selection'],

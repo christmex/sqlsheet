@@ -10,7 +10,13 @@ export type UseAppearanceReturn = {
 };
 
 const listeners = new Set<() => void>();
-let currentAppearance: Appearance = 'system';
+/**
+ * The product has a look of its own, so it opens in it. Someone who prefers
+ * the dark one still gets it — by asking for it, not by their desktop deciding.
+ */
+const appearanceWhenNobodyHasChosen: Appearance = 'light';
+
+let currentAppearance: Appearance = appearanceWhenNobodyHasChosen;
 
 const prefersDark = (): boolean => {
     if (typeof window === 'undefined') {
@@ -31,10 +37,13 @@ const setCookie = (name: string, value: string, days = 365): void => {
 
 const getStoredAppearance = (): Appearance => {
     if (typeof window === 'undefined') {
-        return 'system';
+        return appearanceWhenNobodyHasChosen;
     }
 
-    return (localStorage.getItem('appearance') as Appearance) || 'system';
+    return (
+        (localStorage.getItem('appearance') as Appearance) ||
+        appearanceWhenNobodyHasChosen
+    );
 };
 
 const isDarkMode = (appearance: Appearance): boolean => {
@@ -76,8 +85,8 @@ export function initializeTheme(): void {
     }
 
     if (!localStorage.getItem('appearance')) {
-        localStorage.setItem('appearance', 'system');
-        setCookie('appearance', 'system');
+        localStorage.setItem('appearance', appearanceWhenNobodyHasChosen);
+        setCookie('appearance', appearanceWhenNobodyHasChosen);
     }
 
     currentAppearance = getStoredAppearance();

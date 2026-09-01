@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -109,5 +110,34 @@ class TeamInvitation extends Model
     public function getRouteKeyName(): string
     {
         return 'code';
+    }
+
+    /**
+     * The invitations waiting for this person, wherever they are shown.
+     *
+     * This used to live on a dashboard. The dashboard is gone, so the query
+     * came with the feature rather than being left behind with the page.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public static function waitingFor(User $user): Collection
+    {
+        return static::query()
+            ->with(['inviter', 'team'])
+            ->whereRaw('LOWER(email) = ?', [Str::lower($user->email)])
+            ->whereNull('accepted_at')
+            ->where(fn ($query) => $query
+                ->whereNull('expires_at')
+                ->orWhere('expires_at', '>=', now()))
+            ->latest()
+            ->get()
+            ->map(fn (self $invitation): array => [
+                'code' => $invitation->code,
+                'inviterName' => $invitation->inviter->name,
+                'team' => [
+                    'name' => $invitation->team->name,
+                    'slug' => $invitation->team->slug,
+                ],
+            ]);
     }
 }

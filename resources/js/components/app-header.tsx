@@ -34,7 +34,7 @@ import { UserMenuContent } from '@/components/user-menu-content';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';
 import { cn, toUrl } from '@/lib/utils';
-import { dashboard } from '@/routes';
+import { index as diagramsIndex } from '@/routes/diagrams';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
 type Props = {
@@ -62,12 +62,12 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
     const { auth, currentTeam } = page.props;
     const getInitials = useInitials();
     const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
-    const dashboardUrl = currentTeam ? dashboard(currentTeam.slug) : '/';
+    const homeUrl = currentTeam ? diagramsIndex(currentTeam.slug) : '/';
 
     const mainNavItems: NavItem[] = [
         {
             title: 'Dashboard',
-            href: dashboardUrl,
+            href: homeUrl,
             icon: LayoutGrid,
         },
     ];
@@ -138,7 +138,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                     </div>
 
                     <Link
-                        href={dashboardUrl}
+                        href={homeUrl}
                         prefetch
                         className="flex items-center space-x-2"
                     >

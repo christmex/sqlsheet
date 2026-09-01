@@ -16,6 +16,8 @@ declare module '@inertiajs/core' {
             sidebarOpen: boolean;
             currentTeam: Team | null;
             teams: Team[];
+            /** How many diagrams the current team holds, shown in the sidebar. */
+            diagramCount: number | null;
             [key: string]: unknown;
         };
     }

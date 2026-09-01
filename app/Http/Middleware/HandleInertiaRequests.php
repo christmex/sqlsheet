@@ -46,6 +46,12 @@ class HandleInertiaRequests extends Middleware
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'currentTeam' => fn () => $user?->currentTeam ? $user->toUserTeam($user->currentTeam) : null,
             'teams' => fn () => $user?->toUserTeams(includeCurrent: true) ?? [],
+
+            /**
+             * The sidebar shows this beside Diagrams on every page, so it is
+             * shared rather than left to whichever page happens to list them.
+             */
+            'diagramCount' => fn (): ?int => $user?->currentTeam?->diagrams()->count(),
         ];
     }
 }

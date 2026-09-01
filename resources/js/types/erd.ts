@@ -229,6 +229,10 @@ export type DiagramSummary = {
     id: number;
     name: string;
     updatedAt: string | null;
+    /** On this person's own shortlist, not the team's. */
+    isStarred: boolean;
+    tables: number;
+    relations: number;
 };
 
 /**
